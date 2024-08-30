@@ -262,10 +262,10 @@ pub fn line_end(
 /// uppercase letter, lowercase letter, '_' character or language-specific word character (like '-' in CSS).
 pub fn previous_word_end(map: &DisplaySnapshot, point: DisplayPoint) -> DisplayPoint {
     let raw_point = point.to_point(map);
-    let scope = map.buffer_snapshot.language_scope_at(raw_point);
+    let classifier = map.buffer_snapshot.char_classifier_at(raw_point);
 
     find_preceding_boundary_display_point(map, point, FindRange::MultiLine, |left, right| {
-        (char_kind(&scope, left) != char_kind(&scope, right) && !left.is_whitespace())
+        (classifier.kind(left) != classifier.kind(right) && !classifier.is_whitespace(left))
             || left == '\n'
     })
 }
@@ -285,11 +285,11 @@ pub fn previous_word_start(map: &DisplaySnapshot, point: DisplayPoint) -> Displa
 /// Returns a position of the start of previous natural word, i.e., a word in the colloquial sense
 pub fn previous_word(map: &DisplaySnapshot, point: DisplayPoint) -> DisplayPoint {
     let raw_point = point.to_point(map);
-    let scope = map.buffer_snapshot.language_scope_at(raw_point);
+    let classifier = map.buffer_snapshot.char_classifier_at(raw_point);
 
     find_preceding_boundary_display_point(map, point, FindRange::MultiLine, |left, right| {
-        char_kind(&scope, left) != char_kind(&scope, right) && !right.is_whitespace()
-        && char_kind(&scope, right) != CharKind::Punctuation
+        classifier.kind(left) != classifier.kind(right) && !classifier.is_whitespace(right)
+        && classifier.kind(right) != CharKind::Punctuation
     })
 }
 
@@ -326,10 +326,10 @@ pub fn next_word_end(map: &DisplaySnapshot, point: DisplayPoint) -> DisplayPoint
 /// uppercase letter, lowercase letter, '_' character or language-specific word character (like '-' in CSS).
 pub fn next_word_start(map: &DisplaySnapshot, point: DisplayPoint) -> DisplayPoint {
     let raw_point = point.to_point(map);
-    let scope = map.buffer_snapshot.language_scope_at(raw_point);
+    let classifier = map.buffer_snapshot.char_classifier_at(raw_point);
 
     find_boundary(map, point, FindRange::MultiLine, |left, right| {
-        (char_kind(&scope, left) != char_kind(&scope, right) && !right.is_whitespace())
+        (classifier.kind(left) != classifier.kind(right) && !classifier.is_whitespace(right))
             || left == '\n'
     })
 }
@@ -337,11 +337,11 @@ pub fn next_word_start(map: &DisplaySnapshot, point: DisplayPoint) -> DisplayPoi
 /// Returns a position of the start of next natural word, i.e., a word in the colloquial sense
 pub fn next_word(map: &DisplaySnapshot, point: DisplayPoint) -> DisplayPoint {
     let raw_point = point.to_point(map);
-    let scope = map.buffer_snapshot.language_scope_at(raw_point);
+    let classifier = map.buffer_snapshot.char_classifier_at(raw_point);
 
     find_boundary(map, point, FindRange::MultiLine, |left, right| {
-        char_kind(&scope, left) != char_kind(&scope, right) && !right.is_whitespace()
-        && char_kind(&scope, right) != CharKind::Punctuation
+        classifier.kind(left) != classifier.kind(right) && !classifier.is_whitespace(right)
+        && classifier.kind(right) != CharKind::Punctuation
     })
 }
 
