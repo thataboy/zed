@@ -417,6 +417,10 @@ pub struct ThemeColorsContent {
     #[serde(rename = "editor.document_highlight.write_background")]
     pub editor_document_highlight_write_background: Option<String>,
 
+    /// Highlighted brackets background color.
+    #[serde(rename = "editor.document_highlight.bracket_background")]
+    pub editor_document_highlight_bracket_background: Option<String>,
+
     /// Terminal background color.
     #[serde(rename = "terminal.background")]
     pub terminal_background: Option<String>,
@@ -790,6 +794,10 @@ impl ThemeColorsContent {
                 .and_then(|color| try_parse_color(color).ok()),
             editor_document_highlight_write_background: self
                 .editor_document_highlight_write_background
+                .as_ref()
+                .and_then(|color| try_parse_color(color).ok()),
+            editor_document_highlight_bracket_background: self
+                .editor_document_highlight_bracket_background
                 .as_ref()
                 .and_then(|color| try_parse_color(color).ok()),
             terminal_background: self
