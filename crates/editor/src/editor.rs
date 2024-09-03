@@ -11564,6 +11564,7 @@ impl Editor {
 
     fn on_buffer_changed(&mut self, _: Model<MultiBuffer>, cx: &mut ViewContext<Self>) {
         cx.notify();
+        refresh_matching_bracket_highlights(self, cx);
     }
 
     fn on_buffer_event(
