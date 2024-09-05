@@ -223,6 +223,7 @@ impl EditorElement {
         register_action(view, cx, Editor::paste);
         register_action(view, cx, Editor::undo);
         register_action(view, cx, Editor::redo);
+        register_action(view, cx, Editor::duplicate_selection);
         register_action(view, cx, Editor::move_page_up);
         register_action(view, cx, Editor::move_page_down);
         register_action(view, cx, Editor::next_screen);

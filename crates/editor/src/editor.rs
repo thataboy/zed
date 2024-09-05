@@ -6411,6 +6411,61 @@ impl Editor {
         self.duplicate_line(false, cx);
     }
 
+    /// move point to the previous line's end if there are only whitespace chars in between
+    fn normalize_point(buffer: &MultiBufferSnapshot, point: Point) -> Point {
+        let mut offset = point.to_offset(&buffer);
+
+        for ch in buffer.reversed_chars_at(offset) {
+            if !ch.is_whitespace() {
+                break;
+            }
+            offset -= ch.len_utf8();
+            if ch == '\n' {
+                break;
+            }
+        }
+
+        let new_point = offset.to_point(&buffer);
+        if new_point.row == point.row {
+            point
+        } else {
+            new_point
+        }
+    }
+
+    /// duplicate selection if selection is not empty; line if all selections are empty
+    pub fn duplicate_selection(&mut self, action: &DuplicateSelection, cx: &mut ViewContext<Self>) {
+        if self.read_only(cx) {
+            return;
+        }
+
+        let selections = self.selections.all::<Point>(cx);
+        let display_map = self.display_map.update(cx, |map, cx| map.snapshot(cx));
+        let buffer = &display_map.buffer_snapshot;
+        let mut edits = Vec::with_capacity(selections.len());
+
+        for selection in selections {
+            if !selection.is_empty() {
+                let start = Self::normalize_point(buffer, selection.start);
+                let end = Self::normalize_point(buffer, selection.end);
+                let text = buffer.text_for_range(start..end).collect::<String>();
+                let pos = if action.append { start } else { end };
+                edits.push((pos..pos, text));
+            }
+        }
+
+        if !edits.is_empty() {
+            self.transact(cx, |this, cx| {
+                this.buffer.update(cx, |buffer, cx| {
+                    buffer.edit(edits, None, cx);
+                });
+                this.request_autoscroll(Autoscroll::fit(), cx);
+            });
+        } else if action.or_line {
+            self.duplicate_line(!action.append, cx);
+        }
+    }
+
     pub fn move_line_up(&mut self, _: &MoveLineUp, cx: &mut ViewContext<Self>) {
         let display_map = self.display_map.update(cx, |map, cx| map.snapshot(cx));
         let buffer = self.buffer.read(cx).snapshot(cx);
