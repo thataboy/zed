@@ -364,7 +364,7 @@ pub fn previous_word_end(map: &DisplaySnapshot, point: DisplayPoint) -> DisplayP
     let raw_point = point.to_point(map);
     let classifier = map.buffer_snapshot.char_classifier_at(raw_point);
 
-    find_boundary(map, point, FindRange::MultiLine, |left, right| {
+    find_preceding_boundary_display_point(map, point, FindRange::MultiLine, |left, right| {
         (classifier.kind(left) != classifier.kind(right) && !classifier.is_whitespace(left))
             || right == '\n'
     })
