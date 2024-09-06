@@ -347,6 +347,53 @@ pub fn next_subword_end(map: &DisplaySnapshot, point: DisplayPoint) -> DisplayPo
     })
 }
 
+/// Returns a position of the next word start, where a word character is defined as either
+/// uppercase letter, lowercase letter, '_' character or language-specific word character (like '-' in CSS).
+pub fn next_word_start(map: &DisplaySnapshot, point: DisplayPoint) -> DisplayPoint {
+    let raw_point = point.to_point(map);
+    let classifier = map.buffer_snapshot.char_classifier_at(raw_point);
+
+    find_boundary(map, point, FindRange::MultiLine, |left, right| {
+        (classifier.kind(left) != classifier.kind(right) && !classifier.is_whitespace(right))
+            || left == '\n'
+    })
+}
+/// Returns a position of the previous word end, where a word character is defined as either
+/// uppercase letter, lowercase letter, '_' character or language-specific word character (like '-' in CSS).
+pub fn previous_word_end(map: &DisplaySnapshot, point: DisplayPoint) -> DisplayPoint {
+    let raw_point = point.to_point(map);
+    let classifier = map.buffer_snapshot.char_classifier_at(raw_point);
+
+    find_boundary(map, point, FindRange::MultiLine, |left, right| {
+        (classifier.kind(left) != classifier.kind(right) && !classifier.is_whitespace(left))
+            || right == '\n'
+    })
+}
+
+/// Returns a position of the start of next natural word, i.e., a word in the colloquial sense
+pub fn next_word(map: &DisplaySnapshot, point: DisplayPoint) -> DisplayPoint {
+    let raw_point = point.to_point(map);
+    let classifier = map.buffer_snapshot.char_classifier_at(raw_point);
+
+    find_boundary(map, point, FindRange::MultiLine, |left, right| {
+        classifier.kind(left) != classifier.kind(right) && !classifier.is_whitespace(right)
+        && classifier.kind(right) != CharKind::Punctuation
+    })
+}
+
+/// Returns a position of the start of previous natural word, i.e., a word in the colloquial sense
+pub fn previous_word(map: &DisplaySnapshot, point: DisplayPoint) -> DisplayPoint {
+    let raw_point = point.to_point(map);
+    let classifier = map.buffer_snapshot.char_classifier_at(raw_point);
+
+    find_preceding_boundary_display_point(map, point, FindRange::MultiLine, |left, right| {
+        classifier.kind(left) != classifier.kind(right) && !classifier.is_whitespace(right)
+        && classifier.kind(right) != CharKind::Punctuation
+    })
+}
+
+
+
 /// Returns a position of the start of the current paragraph, where a paragraph
 /// is defined as a run of non-blank lines.
 pub fn start_of_paragraph(

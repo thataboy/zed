@@ -63,6 +63,7 @@
       "cmd-v": "editor::Paste",
       "cmd-z": "editor::Undo",
       "cmd-shift-z": "editor::Redo",
+      "ctrl-shift-0": ["editor::DuplicateSelection", { "or_line": true, "append": true}],  // append text and move cursor forward
       "up": "editor::MoveUp",
       "ctrl-up": "editor::MoveToStartOfParagraph",
       "pageup": "editor::MovePageUp",

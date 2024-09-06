@@ -64,6 +64,7 @@
       "ctrl-y": "editor::Redo",
       "ctrl-z": "editor::Undo",
       "ctrl-shift-z": "editor::Redo",
+      "ctrl-shift-0": ["editor::DuplicateSelection", { "or_line": true, "append": true }], // append duplicated text and move cursor forward
       "up": "editor::MoveUp",
       "ctrl-up": "editor::LineUp",
       "ctrl-down": "editor::LineDown",

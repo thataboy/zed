@@ -59,7 +59,7 @@ use convert_case::{Case, Casing};
 use debounced_delay::DebouncedDelay;
 use display_map::*;
 pub use display_map::{DisplayPoint, FoldPlaceholder};
-pub use editor_settings::{CurrentLineHighlight, EditorSettings, ScrollBeyondLastLine};
+pub use editor_settings::{CurrentLineHighlight, EditorSettings, ScrollBeyondLastLine, SearchMode};
 pub use editor_settings_controls::*;
 use element::LineWithInvisibles;
 pub use element::{
@@ -6411,6 +6411,61 @@ impl Editor {
         self.duplicate_line(false, cx);
     }
 
+    /// move point to the previous line's end if there are only whitespace chars in between
+    fn normalize_point(buffer: &MultiBufferSnapshot, point: Point) -> Point {
+        let mut offset = point.to_offset(&buffer);
+
+        for ch in buffer.reversed_chars_at(offset) {
+            if !ch.is_whitespace() {
+                break;
+            }
+            offset -= ch.len_utf8();
+            if ch == '\n' {
+                break;
+            }
+        }
+
+        let new_point = offset.to_point(&buffer);
+        if new_point.row == point.row {
+            point
+        } else {
+            new_point
+        }
+    }
+
+    /// duplicate selection if selection is not empty; line if all selections are empty
+    pub fn duplicate_selection(&mut self, action: &DuplicateSelection, cx: &mut ViewContext<Self>) {
+        if self.read_only(cx) {
+            return;
+        }
+
+        let selections = self.selections.all::<Point>(cx);
+        let display_map = self.display_map.update(cx, |map, cx| map.snapshot(cx));
+        let buffer = &display_map.buffer_snapshot;
+        let mut edits = Vec::with_capacity(selections.len());
+
+        for selection in selections {
+            if !selection.is_empty() {
+                let start = Self::normalize_point(buffer, selection.start);
+                let end = Self::normalize_point(buffer, selection.end);
+                let text = buffer.text_for_range(start..end).collect::<String>();
+                let pos = if action.append { start } else { end };
+                edits.push((pos..pos, text));
+            }
+        }
+
+        if !edits.is_empty() {
+            self.transact(cx, |this, cx| {
+                this.buffer.update(cx, |buffer, cx| {
+                    buffer.edit(edits, None, cx);
+                });
+                this.request_autoscroll(Autoscroll::fit(), cx);
+            });
+        } else if action.or_line {
+            self.duplicate_line(!action.append, cx);
+        }
+    }
+
     pub fn move_line_up(&mut self, _: &MoveLineUp, cx: &mut ViewContext<Self>) {
         let display_map = self.display_map.update(cx, |map, cx| map.snapshot(cx));
         let buffer = self.buffer.read(cx).snapshot(cx);
@@ -7280,6 +7335,30 @@ impl Editor {
         })
     }
 
+    pub fn move_to_previous_word_end(
+        &mut self,
+        _: &MoveToPreviousWordEnd,
+        cx: &mut ViewContext<Self>,
+    ) {
+        self.change_selections(Some(Autoscroll::fit()), cx, |s| {
+            s.move_cursors_with(|map, head, _| {
+                (movement::previous_word_end(map, head), SelectionGoal::None)
+            });
+        })
+    }
+
+    pub fn move_to_previous_word(
+        &mut self,
+        _: &MoveToPreviousWord,
+        cx: &mut ViewContext<Self>,
+    ) {
+        self.change_selections(Some(Autoscroll::fit()), cx, |s| {
+            s.move_cursors_with(|map, head, _| {
+                (movement::previous_word(map, head), SelectionGoal::None)
+            });
+        })
+    }
+
     pub fn move_to_previous_subword_start(
         &mut self,
         _: &MoveToPreviousSubwordStart,
@@ -7349,6 +7428,26 @@ impl Editor {
         });
     }
 
+    pub fn delete_to_previous_word_end(
+        &mut self,
+        _: &DeleteToPreviousWordEnd,
+        cx: &mut ViewContext<Self>,
+    ) {
+        self.transact(cx, |this, cx| {
+            this.select_autoclose_pair(cx);
+            this.change_selections(Some(Autoscroll::fit()), cx, |s| {
+                let line_mode = s.line_mode;
+                s.move_with(|map, selection| {
+                    if selection.is_empty() && !line_mode {
+                        let cursor = movement::previous_word_end(map, selection.head());
+                        selection.set_head(cursor, SelectionGoal::None);
+                    }
+                });
+            });
+            this.insert("", cx);
+        });
+    }
+
     pub fn delete_to_previous_subword_start(
         &mut self,
         _: &DeleteToPreviousSubwordStart,
@@ -7373,6 +7472,22 @@ impl Editor {
         self.change_selections(Some(Autoscroll::fit()), cx, |s| {
             s.move_cursors_with(|map, head, _| {
                 (movement::next_word_end(map, head), SelectionGoal::None)
+            });
+        })
+    }
+
+    pub fn move_to_next_word_start(&mut self, _: &MoveToNextWordStart, cx: &mut ViewContext<Self>) {
+        self.change_selections(Some(Autoscroll::fit()), cx, |s| {
+            s.move_cursors_with(|map, head, _| {
+                (movement::next_word_start(map, head), SelectionGoal::None)
+            });
+        })
+    }
+
+    pub fn move_to_next_word(&mut self, _: &MoveToNextWord, cx: &mut ViewContext<Self>) {
+        self.change_selections(Some(Autoscroll::fit()), cx, |s| {
+            s.move_cursors_with(|map, head, _| {
+                (movement::next_word(map, head), SelectionGoal::None)
             });
         })
     }
@@ -7424,6 +7539,25 @@ impl Editor {
                         } else {
                             movement::next_word_end_or_newline(map, selection.head())
                         };
+                        selection.set_head(cursor, SelectionGoal::None);
+                    }
+                });
+            });
+            this.insert("", cx);
+        });
+    }
+
+    pub fn delete_to_next_word_start(
+        &mut self,
+        _: &DeleteToNextWordStart,
+        cx: &mut ViewContext<Self>,
+    ) {
+        self.transact(cx, |this, cx| {
+            this.change_selections(Some(Autoscroll::fit()), cx, |s| {
+                let line_mode = s.line_mode;
+                s.move_with(|map, selection| {
+                    if selection.is_empty() && !line_mode {
+                        let cursor = movement::next_word_start(map, selection.head());
                         selection.set_head(cursor, SelectionGoal::None);
                     }
                 });
@@ -11497,6 +11631,7 @@ impl Editor {
 
     fn on_buffer_changed(&mut self, _: Model<MultiBuffer>, cx: &mut ViewContext<Self>) {
         cx.notify();
+        refresh_matching_bracket_highlights(self, cx);
     }
 
     fn on_buffer_event(

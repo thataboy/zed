@@ -171,6 +171,8 @@ pub struct ThemeColors {
     /// special attention. Usually a document highlight is visualized by changing
     /// the background color of its range.
     pub editor_document_highlight_write_background: Hsla,
+    /// Highlighted brackets background color.
+    pub editor_document_highlight_bracket_background: Hsla,
 
     // ===
     // Terminal

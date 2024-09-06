@@ -52,6 +52,14 @@ pub struct SelectToEndOfLine {
 }
 
 #[derive(PartialEq, Clone, Deserialize, Default)]
+pub struct DuplicateSelection {
+    #[serde(default = "default_true")]
+    pub(super) or_line: bool,
+    #[serde(default = "default_true")]
+    pub(super) append: bool,
+}
+
+#[derive(PartialEq, Clone, Deserialize, Default)]
 pub struct ToggleCodeActions {
     // Display row from which the action was deployed.
     #[serde(default)]
@@ -161,6 +169,7 @@ impl_actions!(
         ComposeCompletion,
         DeleteToNextWordEnd,
         DeleteToPreviousWordStart,
+        DuplicateSelection,
         ExpandExcerpts,
         ExpandExcerptsUp,
         ExpandExcerptsDown,
@@ -222,7 +231,9 @@ gpui::actions!(
         DeleteToBeginningOfLine,
         DeleteToEndOfLine,
         DeleteToNextSubwordEnd,
+        DeleteToNextWordStart,
         DeleteToPreviousSubwordStart,
+        DeleteToPreviousWordEnd,
         DisplayCursorNames,
         DuplicateLineDown,
         DuplicateLineUp,
@@ -261,8 +272,12 @@ gpui::actions!(
         MoveToEnd,
         MoveToEndOfParagraph,
         MoveToNextSubwordEnd,
+        MoveToNextWord,
         MoveToNextWordEnd,
+        MoveToNextWordStart,
         MoveToPreviousSubwordStart,
+        MoveToPreviousWord,
+        MoveToPreviousWordEnd,
         MoveToPreviousWordStart,
         MoveToStartOfParagraph,
         MoveUp,
