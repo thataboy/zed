@@ -508,7 +508,8 @@ impl BufferSearchBar {
         let search_options = SearchOptions::from_settings(&EditorSettings::get_global(cx).search);
 
         let settings_subscription = cx.observe_global::<SettingsStore>(move |this, cx| {
-            this.default_options = SearchOptions::from_settings(&EditorSettings::get_global(cx).search);
+            this.default_options =
+                SearchOptions::from_settings(&EditorSettings::get_global(cx).search);
         });
 
         Self {

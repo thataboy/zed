@@ -7340,11 +7340,7 @@ impl Editor {
         })
     }
 
-    pub fn move_to_previous_word(
-        &mut self,
-        _: &MoveToPreviousWord,
-        cx: &mut ViewContext<Self>,
-    ) {
+    pub fn move_to_previous_word(&mut self, _: &MoveToPreviousWord, cx: &mut ViewContext<Self>) {
         self.change_selections(Some(Autoscroll::fit()), cx, |s| {
             s.move_cursors_with(|map, head, _| {
                 (movement::previous_word(map, head), SelectionGoal::None)

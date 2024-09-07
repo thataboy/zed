@@ -376,8 +376,9 @@ pub fn next_word(map: &DisplaySnapshot, point: DisplayPoint) -> DisplayPoint {
     let classifier = map.buffer_snapshot.char_classifier_at(raw_point);
 
     find_boundary(map, point, FindRange::MultiLine, |left, right| {
-        classifier.kind(left) != classifier.kind(right) && !classifier.is_whitespace(right)
-        && classifier.kind(right) != CharKind::Punctuation
+        classifier.kind(left) != classifier.kind(right)
+            && !classifier.is_whitespace(right)
+            && classifier.kind(right) != CharKind::Punctuation
     })
 }
 
@@ -387,12 +388,11 @@ pub fn previous_word(map: &DisplaySnapshot, point: DisplayPoint) -> DisplayPoint
     let classifier = map.buffer_snapshot.char_classifier_at(raw_point);
 
     find_preceding_boundary_display_point(map, point, FindRange::MultiLine, |left, right| {
-        classifier.kind(left) != classifier.kind(right) && !classifier.is_whitespace(right)
-        && classifier.kind(right) != CharKind::Punctuation
+        classifier.kind(left) != classifier.kind(right)
+            && !classifier.is_whitespace(right)
+            && classifier.kind(right) != CharKind::Punctuation
     })
 }
-
-
 
 /// Returns a position of the start of the current paragraph, where a paragraph
 /// is defined as a run of non-blank lines.
