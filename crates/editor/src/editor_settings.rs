@@ -29,7 +29,7 @@ pub struct EditorSettings {
     pub double_click_in_multibuffer: DoubleClickInMultibuffer,
     pub search_wrap: bool,
     #[serde(default)]
-    pub search_defaults: SearchDefaults,
+    pub search: SearchSettings,
     pub auto_signature_help: bool,
     pub show_signature_help_after_edits: bool,
     pub jupyter: Jupyter,
@@ -158,10 +158,9 @@ pub enum ScrollBeyondLastLine {
     VerticalScrollMargin,
 }
 
-/// Default match options; all false
+/// Default options for buffer and project search items.
 #[derive(Copy, Clone, Default, Debug, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
-#[serde(rename_all = "snake_case")]
-pub struct SearchDefaults {
+pub struct SearchSettings {
     #[serde(default)]
     pub whole_word: bool,
     #[serde(default)]
@@ -170,6 +169,27 @@ pub struct SearchDefaults {
     pub include_ignored: bool,
     #[serde(default)]
     pub regex: bool,
+}
+
+#[derive(Clone, Default, Serialize, Deserialize, JsonSchema, Debug)]
+pub struct SearchSettingsContent {
+    pub whole_word: Option<bool>,
+    pub case_sensitive: Option<bool>,
+    pub include_ignored: Option<bool>,
+    pub regex: Option<bool>,
+}
+
+impl Settings for SearchSettings {
+    const KEY: Option<&'static str> = Some("search");
+
+    type FileContent = SearchSettingsContent;
+
+    fn load(
+        sources: SettingsSources<Self::FileContent>,
+        _: &mut gpui::AppContext,
+    ) -> anyhow::Result<Self> {
+        sources.json_merge()
+    }
 }
 
 #[derive(Clone, Default, Serialize, Deserialize, JsonSchema)]
@@ -267,10 +287,10 @@ pub struct EditorSettingsContent {
     /// Default: true
     pub search_wrap: Option<bool>,
 
-    /// Defaults for search options (case sensitive, whole word, include ignored, regex)
+    /// Defaults to use when opening a new buffer and project search items.
     ///
-    /// Default: all false
-    pub search_defaults: Option<SearchDefaults>,
+    /// Default: nothing is enabled
+    pub search: Option<SearchSettings>,
 
     /// Whether to automatically show a signature help pop-up or not.
     ///
