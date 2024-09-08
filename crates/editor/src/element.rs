@@ -31,7 +31,7 @@ use collections::{BTreeMap, HashMap};
 use git::{blame::BlameEntry, diff::DiffHunkStatus, Oid};
 use gpui::Subscription;
 use gpui::{
-    anchored, deferred, div, fill, outline, point, px, quad, relative, size, svg,
+    anchored, deferred, div, fill, fill_ex, outline_ex, point, px, quad, relative, size, svg,
     transparent_black, Action, AnchorCorner, AnyElement, AvailableSpace, Bounds, ClipboardItem,
     ContentMask, Corners, CursorStyle, DispatchPhase, Edges, Element, ElementInputHandler, Entity,
     EntityId, FontId, GlobalElementId, Hitbox, Hsla, InteractiveElement, IntoElement, Length,
@@ -1086,6 +1086,7 @@ impl EditorElement {
                         block_width,
                         origin: point(x, y),
                         line_height,
+                        radius: line_height * CURSOR_ROUNDNESS,
                         shape: selection.cursor_shape,
                         block_text,
                         cursor_name: None,
@@ -5990,10 +5991,14 @@ pub struct IndentGuideLayout {
     settings: IndentGuideSettings,
 }
 
+const CURSOR_ROUNDNESS: f32 = 0.125;
+const CURSOR_THICKNESS: f32 = 1.4;
+
 pub struct CursorLayout {
     origin: gpui::Point<Pixels>,
     block_width: Pixels,
     line_height: Pixels,
+    radius: Pixels,
     color: Hsla,
     shape: CursorShape,
     block_text: Option<ShapedLine>,
@@ -6020,6 +6025,7 @@ impl CursorLayout {
             origin,
             block_width,
             line_height,
+            radius: line_height * CURSOR_ROUNDNESS,
             color,
             shape,
             block_text,
@@ -6088,9 +6094,9 @@ impl CursorLayout {
 
         //Draw background or border quad
         let cursor = if matches!(self.shape, CursorShape::Hollow) {
-            outline(bounds, self.color)
+            outline_ex(bounds, self.color, self.radius, Pixels(CURSOR_THICKNESS))
         } else {
-            fill(bounds, self.color)
+            fill_ex(bounds, self.color, self.radius)
         };
 
         if let Some(name) = &mut self.cursor_name {
@@ -6098,6 +6104,19 @@ impl CursorLayout {
         }
 
         cx.paint_quad(cursor);
+
+        let bar_bounds = Bounds {
+            origin: gpui::Point {
+                x: bounds.origin.x,
+                y: bounds.origin.y - Pixels(2.0),
+            },
+            size: Size {
+                width: Pixels(2.0),
+                height: bounds.size.height + Pixels(4.0),
+            },
+        };
+        let bar = fill(bar_bounds, Hsla::red());
+        cx.paint_quad(bar);
 
         if let Some(block_text) = &self.block_text {
             block_text

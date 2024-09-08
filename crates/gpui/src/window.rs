@@ -4985,3 +4985,34 @@ pub fn outline(bounds: impl Into<Bounds<Pixels>>, border_color: impl Into<Hsla>)
         border_color: border_color.into(),
     }
 }
+
+/// Creates a filled quad with the given bounds and background color, radius
+pub fn fill_ex(
+    bounds: impl Into<Bounds<Pixels>>,
+    background: impl Into<Hsla>,
+    radius: Pixels,
+) -> PaintQuad {
+    PaintQuad {
+        bounds: bounds.into(),
+        corner_radii: (radius).into(),
+        background: background.into(),
+        border_widths: (1.).into(),
+        border_color: transparent_black(),
+    }
+}
+
+/// Creates a rectangle outline with the given bounds, border color, radius, thickness
+pub fn outline_ex(
+    bounds: impl Into<Bounds<Pixels>>,
+    border_color: impl Into<Hsla>,
+    radius: Pixels,
+    thickness: Pixels,
+) -> PaintQuad {
+    PaintQuad {
+        bounds: bounds.into(),
+        corner_radii: (radius).into(),
+        background: transparent_black(),
+        border_widths: (thickness).into(),
+        border_color: border_color.into(),
+    }
+}

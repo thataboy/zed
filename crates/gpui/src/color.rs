@@ -471,6 +471,20 @@ impl Hsla {
             a: self.a * factor.clamp(0., 1.),
         }
     }
+
+    /// Returns a new HSLA color, inverted
+    pub fn invert(&self) -> Hsla {
+        Hsla {
+            // Invert hue by adding 0.5 and wrapping around if it exceeds 1
+            h: (self.h + 0.5) % 1.0,
+            // Keep saturation the same
+            s: self.s,
+            // Invert lightness
+            l: 1.0 - self.l,
+            // Keep alpha the same
+            a: self.a,
+        }
+    }
 }
 
 impl From<Rgba> for Hsla {
