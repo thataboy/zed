@@ -151,7 +151,7 @@ pub struct EditorElement {
 type DisplayRowDelta = u32;
 
 impl EditorElement {
-    pub(crate) const SCROLLBAR_WIDTH: Pixels = px(13.);
+    pub(crate) const SCROLLBAR_WIDTH: Pixels = px(120.);
 
     pub fn new(editor: &View<Editor>, style: EditorStyle) -> Self {
         Self {
@@ -3554,7 +3554,7 @@ impl EditorElement {
 
                 cx.paint_quad(quad(
                     thumb_bounds,
-                    Corners::default(),
+                    Corners::all(Pixels(10.0)),
                     cx.theme().colors().scrollbar_thumb_background,
                     Edges {
                         top: Pixels::ZERO,
@@ -4984,7 +4984,8 @@ impl Element for EditorElement {
                     let text_width = bounds.size.width - gutter_dimensions.width;
 
                     let right_margin = if snapshot.mode == EditorMode::Full {
-                        EditorElement::SCROLLBAR_WIDTH
+                        // EditorElement::SCROLLBAR_WIDTH
+                        px(EditorElement::SCROLLBAR_WIDTH.0.min(13.0))
                     } else {
                         px(0.)
                     };
@@ -5784,7 +5785,11 @@ impl ScrollbarLayout {
     const BORDER_WIDTH: Pixels = px(1.0);
     const LINE_MARKER_HEIGHT: Pixels = px(2.0);
     const MIN_MARKER_HEIGHT: Pixels = px(5.0);
-    const MIN_THUMB_HEIGHT: Pixels = px(20.0);
+    const MIN_THUMB_HEIGHT: Pixels = if EditorElement::SCROLLBAR_WIDTH.0 * 9. / 16. < 70. {
+        px(EditorElement::SCROLLBAR_WIDTH.0 * 9. / 16.)
+    } else {
+        px(70.)
+    };
 
     fn thumb_bounds(&self) -> Bounds<Pixels> {
         let thumb_top = self.y_for_row(self.visible_row_range.start);
@@ -5809,8 +5814,10 @@ impl ScrollbarLayout {
             max: Pixels,
         }
         let (x_range, height_limit) = if let Some(column) = column {
-            let column_width = px(((self.hitbox.size.width - Self::BORDER_WIDTH).0 / 3.0).floor());
-            let start = Self::BORDER_WIDTH + (column as f32 * column_width);
+            let column_width = px(((self.hitbox.size.width - Self::BORDER_WIDTH).0 / 3.0)
+                .floor()
+                .min(15.));
+            let start = self.hitbox.size.width - (column as f32 * column_width);
             let end = start + column_width;
             (
                 Range { start, end },
@@ -5820,9 +5827,12 @@ impl ScrollbarLayout {
                 },
             )
         } else {
+            let column_width = px(((self.hitbox.size.width - Self::BORDER_WIDTH).0)
+                .floor()
+                .min(15.));
             (
                 Range {
-                    start: Self::BORDER_WIDTH,
+                    start: self.hitbox.size.width - column_width,
                     end: self.hitbox.size.width,
                 },
                 MinMax {

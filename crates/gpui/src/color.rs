@@ -479,9 +479,18 @@ impl Hsla {
             h: (self.h + 0.5) % 1.0,
             // Keep saturation the same
             s: self.s,
-            // Invert lightness
             l: 1.0 - self.l,
-            // Keep alpha the same
+            a: self.a,
+        }
+    }
+
+    /// Returns a complementary HSLA color by rotating hue by 180 deg
+    pub fn complementary(&self) -> Hsla {
+        Hsla {
+            // Shift hue by 0.5 (180 degrees) and wrap around if it exceeds 1
+            h: (self.h + 0.5) % 1.0,
+            s: self.s,
+            l: self.l,
             a: self.a,
         }
     }
