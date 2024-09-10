@@ -2240,6 +2240,10 @@ impl Editor {
         let placeholder_text = Some(placeholder_text.into());
         if self.placeholder_text != placeholder_text {
             self.placeholder_text = placeholder_text;
+            // lazily fall back to bar cursor if field has placehoplder text
+            if self.placeholder_text.is_some() && matches!(self.cursor_shape, CursorShape::Block) {
+                self.cursor_shape = CursorShape::Bar;
+            }
             cx.notify();
         }
     }
