@@ -50,7 +50,7 @@ impl gpui::Element for ProjectPanelScrollbar {
         let mut style = Style::default();
         style.flex_grow = 1.;
         style.flex_shrink = 1.;
-        style.size.width = px(12.).into();
+        style.size.width = px(18.).into();
         style.size.height = relative(1.).into();
         (cx.request_layout(style, None), ())
     }
