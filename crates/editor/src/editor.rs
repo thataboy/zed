@@ -4979,9 +4979,10 @@ impl Editor {
         let cursor = self.selections.newest_anchor().head();
         let (buffer, cursor_buffer_position) =
             self.buffer.read(cx).text_anchor_for_position(cursor, cx)?;
+
         if !user_requested
-            && self.enable_inline_completions
-            && !self.should_show_inline_completions(&buffer, cursor_buffer_position, cx)
+            && (!self.enable_inline_completions
+                || !self.should_show_inline_completions(&buffer, cursor_buffer_position, cx))
         {
             self.discard_inline_completion(false, cx);
             return None;
@@ -10753,7 +10754,7 @@ impl Editor {
         let fs = workspace.read(cx).app_state().fs.clone();
         let current_show = TabBarSettings::get_global(cx).show;
         update_settings_file::<TabBarSettings>(fs, cx, move |setting, _| {
-            setting.show = Some(!current_show);
+            setting.show = !current_show;
         });
     }
 
@@ -12581,7 +12582,7 @@ fn inlay_hint_settings(
     let language = snapshot.language_at(location);
     let settings = all_language_settings(file, cx);
     settings
-        .language(language.map(|l| l.name()).as_deref())
+        .language(language.map(|l| l.name()).as_ref())
         .inlay_hints
 }
 
@@ -12678,7 +12679,7 @@ impl EditorSnapshot {
         let show_git_gutter = self.show_git_diff_gutter.unwrap_or_else(|| {
             matches!(
                 ProjectSettings::get_global(cx).git.git_gutter,
-                Some(GitGutterSetting::TrackedFiles)
+                GitGutterSetting::TrackedFiles
             )
         });
         let gutter_settings = EditorSettings::get_global(cx).gutter;
