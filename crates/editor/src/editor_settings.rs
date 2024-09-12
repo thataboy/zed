@@ -9,7 +9,7 @@ use settings::{Settings, SettingsSources};
 pub struct EditorSettings {
     /// Whether the cursor blinks in the editor.
     pub cursor_blink: bool,
-    /// Type of cursor to use for the editor (bar, block, underline, hollow)
+    /// Type of cursor to use for the editor (bar, block, underscore, hollow)
     pub cursor_shape: CursorShape,
     /// How to highlight the current line in the editor.
     pub current_line_highlight: CurrentLineHighlight,

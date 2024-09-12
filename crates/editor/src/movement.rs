@@ -347,8 +347,7 @@ pub fn next_subword_end(map: &DisplaySnapshot, point: DisplayPoint) -> DisplayPo
     })
 }
 
-/// Returns a position of the next word start, where a word character is defined as either
-/// uppercase letter, lowercase letter, '_' character or language-specific word character (like '-' in CSS).
+/// Returns a position of the next word start
 pub fn next_word_start(map: &DisplaySnapshot, point: DisplayPoint) -> DisplayPoint {
     let raw_point = point.to_point(map);
     let classifier = map.buffer_snapshot.char_classifier_at(raw_point);
@@ -358,14 +357,15 @@ pub fn next_word_start(map: &DisplaySnapshot, point: DisplayPoint) -> DisplayPoi
     })
 }
 
-/// Returns a position of the previous word end, where a word character is defined as either
-/// uppercase letter, lowercase letter, '_' character or language-specific word character (like '-' in CSS).
+/// Returns a position of the previous word end
 pub fn previous_word_end(map: &DisplaySnapshot, point: DisplayPoint) -> DisplayPoint {
     let raw_point = point.to_point(map);
     let classifier = map.buffer_snapshot.char_classifier_at(raw_point);
 
     find_preceding_boundary_display_point(map, point, FindRange::MultiLine, |left, right| {
-        classifier.kind(left) != classifier.kind(right) || right == '\n'
+        classifier.kind(left) != classifier.kind(right)
+            || right == '\n' && left != '\n'
+            || left == '\n' && right == '\n'
     })
 }
 
