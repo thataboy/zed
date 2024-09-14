@@ -1039,7 +1039,7 @@ impl EditorElement {
                                         &[TextRun {
                                             len,
                                             font,
-                                            color: self.style.background,
+                                            color: player_color.cursor.invert(),
                                             background_color: None,
                                             strikethrough: None,
                                             underline: None,
@@ -6117,18 +6117,18 @@ impl CursorLayout {
 
         cx.paint_quad(cursor);
 
-        let bar_bounds = Bounds {
-            origin: gpui::Point {
-                x: bounds.origin.x,
-                y: bounds.origin.y - Pixels(2.0),
-            },
-            size: Size {
-                width: Pixels(2.0),
-                height: bounds.size.height + Pixels(4.0),
-            },
-        };
-        let bar = fill(bar_bounds, Hsla::red());
-        cx.paint_quad(bar);
+        // let bar_bounds = Bounds {
+        //     origin: gpui::Point {
+        //         x: bounds.origin.x,
+        //         y: bounds.origin.y - Pixels(2.0),
+        //     },
+        //     size: Size {
+        //         width: Pixels(2.0),
+        //         height: bounds.size.height + Pixels(4.0),
+        //     },
+        // };
+        // let bar = fill(bar_bounds, Hsla::red());
+        // cx.paint_quad(bar);
 
         if let Some(block_text) = &self.block_text {
             block_text

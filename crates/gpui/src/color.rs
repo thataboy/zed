@@ -472,6 +472,16 @@ impl Hsla {
         }
     }
 
+    /// Returns a new HSLA color with the same HSL but new alpha value.
+    pub fn alpha(&self, alpha: f32) -> Self {
+        Hsla {
+            h: self.h,
+            s: self.s,
+            l: self.l,
+            a: alpha.clamp(0., 1.),
+        }
+    }
+
     /// Returns a new HSLA color, inverted
     pub fn invert(&self) -> Hsla {
         Hsla {
