@@ -3088,65 +3088,65 @@ impl ContextEditor {
         });
     }
 
-    fn trimmed_line_at(buffer: &MultiBufferSnapshot, row: u32) -> String {
-        buffer
-            .text_for_range(
-                Point::new(row, 0)..Point::new(row, buffer.line_len(MultiBufferRow(row))),
-            )
-            .collect::<String>()
-            .trim()
-            .to_string()
-    }
-
-    fn find_code_block_delimiter(
-        buffer: &MultiBufferSnapshot,
-        cursor_row: u32,
-        forward: bool,
-    ) -> Option<u32> {
+    /// find the start and end row of code block enclosed by CODE_BLOCK_DELIMITER
+    /// where cursor currently sits
+    fn find_code_block(buffer: &MultiBufferSnapshot, cursor: u32) -> Option<Range<Point>> {
         const CODE_BLOCK_DELIMITER: &str = "```";
 
-        let mut row = cursor_row;
+        let mut block_start = None;
+        let mut block_end = None;
+        let nrows = buffer.max_point().row;
+        // if cursor is in bottom half of buffer, search in reverse
+        let (rows, reverse) = if cursor > nrows << 1 {
+            (nrows..=0, true)
+        } else {
+            (0..=nrows, false)
+        };
 
-        loop {
-            let line = Self::trimmed_line_at(&buffer, row);
+        for row in rows {
+            let line =
+                if let Some((buffer, range)) = buffer.buffer_line_for_row(MultiBufferRow(row)) {
+                    buffer
+                        .text_for_range(range)
+                        .collect::<String>()
+                        .trim()
+                        .to_string()
+                } else {
+                    String::new()
+                };
+
             if line.starts_with(CODE_BLOCK_DELIMITER) {
-                // if <delimiter> is not on cursor row, we're good
-                // otherwise, make assumption that AI generated code blocks don't have
-                // leading or trailing blank lines between <delimiter>
-
-                // looking for start -> is line <delimiter>something or is next line not blank?
-                // looking for end -> is line <delimter> and is previous line blank?
-                if row != cursor_row
-                    || !forward
-                        && (line.len() > CODE_BLOCK_DELIMITER.len()
-                            || row < buffer.max_point().row
-                                && !Self::trimmed_line_at(&buffer, row + 1).is_empty())
-                    || forward
-                        && line.len() == CODE_BLOCK_DELIMITER.len()
-                        && row > 0
-                        && !Self::trimmed_line_at(&buffer, row - 1).is_empty()
-                {
-                    return Some(row);
+                if block_start.is_some() {
+                    if block_end.is_some() {
+                        block_start = Some(row);
+                        block_end = None;
+                    } else {
+                        block_end = Some(row);
+                    }
+                } else {
+                    block_start = Some(row);
                 }
             }
-            if forward {
-                row += 1;
-                if row >= buffer.max_point().row {
-                    break;
+            if let Some(a) = block_start {
+                if let Some(b) = block_end {
+                    let x = a.min(b);
+                    let y = a.max(b);
+                    if x <= cursor && cursor <= y {
+                        return Some(Point::new((x + 1).min(y), 0)..Point::new(y, 0));
+                    }
+                    // went past cursor
+                    if reverse && cursor > y || !reverse && cursor < x {
+                        return None;
+                    }
                 }
-            } else {
-                if row == 0 {
-                    break;
-                }
-                row -= 1;
             }
         }
-        return None;
+        None
     }
 
-    // return selected text or if selection is empty
-    // attempt to return the block of code enclosed by CODE_BLOCK_DELIMITER
-    // where the cursor is currently
+    /// return selected text
+    /// or if selection is empty, return the code block where the cursor currently sits
+    /// or empty string
     fn get_selection_or_code_block(
         context_editor_view: &View<ContextEditor>,
         cx: &mut ViewContext<Workspace>,
@@ -3160,14 +3160,9 @@ impl ContextEditor {
 
         if text.is_empty() {
             let cursor_row = anchor.start.to_point(&buffer).row;
-            if let Some(start) = Self::find_code_block_delimiter(&buffer, cursor_row, false) {
-                if let Some(end) = Self::find_code_block_delimiter(&buffer, cursor_row, true) {
-                    if start <= cursor_row && cursor_row <= end {
-                        let range = Point::new((start + 1).min(end), 0)..Point::new(end, 0);
-                        text = buffer.text_for_range(range).collect::<String>();
-                        is_code_block = true;
-                    }
-                }
+            if let Some(range) = Self::find_code_block(&buffer, cursor_row) {
+                text = buffer.text_for_range(range).collect::<String>();
+                is_code_block = true;
             }
         }
 
