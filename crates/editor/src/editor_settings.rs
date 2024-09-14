@@ -179,13 +179,13 @@ pub struct EditorSettingsContent {
     ///
     /// Default: true
     pub cursor_blink: Option<bool>,
-    /// How to highlight the current line in the editor.
-    ///
-    /// Default: all
-    pub cursor_shape: Option<CursorShape>,
     /// Type of cursor to use for the editor (bar, block, underscore, hollow
     ///
     /// Default: bar
+    pub cursor_shape: Option<CursorShape>,
+    /// How to highlight the current line in the editor.
+    ///
+    /// Default: all
     pub current_line_highlight: Option<CurrentLineHighlight>,
     /// Whether to show the informational hover box when moving the mouse
     /// over symbols in the editor.

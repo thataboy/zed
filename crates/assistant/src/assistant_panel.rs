@@ -4222,7 +4222,7 @@ impl ContextEditor {
                         h_flex()
                             .gap_3()
                             .child(
-                                Icon::new(IconName::ExclamationTriangle)
+                                Icon::new(IconName::Warning)
                                     .size(IconSize::Small)
                                     .color(Color::Warning),
                             )
@@ -4835,6 +4835,20 @@ impl Render for ContextEditorToolbarItem {
         let weak_self = cx.view().downgrade();
         let right_side = h_flex()
             .gap_2()
+            // TODO display this in a nicer way, once we have a design for it.
+            // .children({
+            //     let project = self
+            //         .workspace
+            //         .upgrade()
+            //         .map(|workspace| workspace.read(cx).project().downgrade());
+            //
+            //     let scan_items_remaining = cx.update_global(|db: &mut SemanticDb, cx| {
+            //         project.and_then(|project| db.remaining_summaries(&project, cx))
+            //     });
+
+            //     scan_items_remaining
+            //         .map(|remaining_items| format!("Files to scan: {}", remaining_items))
+            // })
             .child(
                 ModelSelector::new(
                     self.fs.clone(),
@@ -5333,7 +5347,7 @@ fn quote_selection_fold_placeholder(title: String, editor: WeakView<Editor>) -> 
                 ButtonLike::new(fold_id)
                     .style(ButtonStyle::Filled)
                     .layer(ElevationIndex::ElevatedSurface)
-                    .child(Icon::new(IconName::TextSelect))
+                    .child(Icon::new(IconName::CursorIBeam))
                     .child(Label::new(title.clone()).single_line())
                     .on_click(move |_, cx| {
                         editor
@@ -5437,7 +5451,7 @@ fn render_docs_slash_command_trailer(
             div()
                 .id(("latest-error", row.0))
                 .child(
-                    Icon::new(IconName::ExclamationTriangle)
+                    Icon::new(IconName::Warning)
                         .size(IconSize::Small)
                         .color(Color::Warning),
                 )
