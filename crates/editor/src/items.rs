@@ -639,6 +639,7 @@ impl Item for Editor {
             .child(
                 Label::new(self.title(cx).to_string())
                     .color(label_color)
+                    .size(LabelSize::Large)
                     .italic(params.preview),
             )
             .when_some(description, |this, description| {
@@ -1472,9 +1473,9 @@ pub fn active_match_index(
 
 pub fn entry_label_color(selected: bool) -> Color {
     if selected {
-        Color::Default
+        Color::Accent
     } else {
-        Color::Muted
+        Color::Default
     }
 }
 

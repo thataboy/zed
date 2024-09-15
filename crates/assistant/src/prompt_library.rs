@@ -102,7 +102,7 @@ pub fn open_prompt_library(
                         titlebar: Some(TitlebarOptions {
                             title: Some("Prompt Library".into()),
                             appears_transparent: cfg!(target_os = "macos"),
-                            traffic_light_position: Some(point(px(9.0), px(9.0))),
+                            traffic_light_position: Some(point(px(9.0), px(5.0))),
                         }),
                         app_id: Some(app_id.to_owned()),
                         window_bounds: Some(WindowBounds::Windowed(bounds)),

@@ -39,7 +39,7 @@ impl Render for StatusBar {
             .w_full()
             .justify_between()
             .gap(Spacing::Large.rems(cx))
-            .py(Spacing::Small.rems(cx))
+            .py(Spacing::XSmall.rems(cx))
             .px(Spacing::Large.rems(cx))
             .bg(cx.theme().colors().status_bar_background)
             .map(|el| match cx.window_decorations() {

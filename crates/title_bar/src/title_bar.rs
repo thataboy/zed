@@ -92,7 +92,7 @@ impl Render for TitleBar {
                 if cx.is_fullscreen() {
                     this.pl_2()
                 } else if self.platform_style == PlatformStyle::Mac {
-                    this.pl(px(platform_mac::TRAFFIC_LIGHT_PADDING))
+                    this.pl(px(platform_mac::TRAFFIC_LIGHT_PADDING + 10.))
                 } else {
                     this.pl_2()
                 }
@@ -112,6 +112,9 @@ impl Render for TitleBar {
                     .border_color(titlebar_color),
             })
             .bg(titlebar_color)
+            .border_1()
+            .rounded_t_lg()
+            .border_color(cx.theme().colors().border_disabled)
             .content_stretch()
             .child(
                 div()
@@ -241,7 +244,7 @@ impl TitleBar {
 
     #[cfg(not(target_os = "windows"))]
     pub fn height(cx: &mut WindowContext) -> Pixels {
-        (1.75 * cx.rem_size()).max(px(34.))
+        (1.2 * cx.rem_size()).max(px(28.))
     }
 
     #[cfg(target_os = "windows")]
