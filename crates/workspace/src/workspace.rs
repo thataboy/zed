@@ -149,6 +149,7 @@ actions!(
         ToggleBottomDock,
         ToggleCenteredLayout,
         ToggleLeftDock,
+        ToggleLeftRightDock,
         ToggleRightDock,
         ToggleZoom,
         Unfollow,
@@ -4362,6 +4363,19 @@ impl Workspace {
                     workspace.toggle_dock(DockPosition::Right, cx);
                 }),
             )
+            .on_action(cx.listener(|this, _: &ToggleLeftRightDock, cx| {
+                if this.left_dock().read(cx).is_open() ^ this.right_dock().read(cx).is_open() {
+                    this.toggle_dock(DockPosition::Right, cx);
+                    this.toggle_dock(DockPosition::Left, cx);
+                } else if this.right_dock().read(cx).is_open() {
+                    this.toggle_dock(DockPosition::Right, cx);
+                } else {
+                    this.toggle_dock(DockPosition::Left, cx);
+                }
+                if this.left_dock().read(cx).is_open() {
+                    this.activate_next_pane(cx);
+                }
+            }))
             .on_action(
                 cx.listener(|workspace: &mut Workspace, _: &ToggleBottomDock, cx| {
                     workspace.toggle_dock(DockPosition::Bottom, cx);
