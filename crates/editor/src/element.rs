@@ -218,6 +218,7 @@ impl EditorElement {
         register_action(view, cx, Editor::move_line_up);
         register_action(view, cx, Editor::move_line_down);
         register_action(view, cx, Editor::transpose);
+        register_action(view, cx, Editor::rewrap);
         register_action(view, cx, Editor::cut);
         register_action(view, cx, Editor::copy);
         register_action(view, cx, Editor::paste);
@@ -2095,13 +2096,13 @@ impl EditorElement {
                         .id(("path excerpt header", EntityId::from(block_id)))
                         .w_full()
                         .px(header_padding)
+                        .pt(header_padding)
                         .child(
                             h_flex()
                                 .flex_basis(Length::Definite(DefiniteLength::Fraction(0.667)))
                                 .id("path header block")
-                                .h(1.1 * cx.line_height())
-                                .pl(gpui::px(12.))
-                                .pr(gpui::px(8.))
+                                .h(2. * cx.line_height())
+                                .px(gpui::px(12.))
                                 .rounded_md()
                                 .shadow_md()
                                 .border_1()

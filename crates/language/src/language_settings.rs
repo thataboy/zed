@@ -741,6 +741,14 @@ pub struct InlayHintSettings {
     /// Default: true
     #[serde(default = "default_true")]
     pub show_other_hints: bool,
+    /// Whether to show a background for inlay hints.
+    ///
+    /// If set to `true`, the background will use the `hint.background` color
+    /// from the current theme.
+    ///
+    /// Default: false
+    #[serde(default)]
+    pub show_background: bool,
     /// Whether or not to debounce inlay hints updates after buffer edits.
     ///
     /// Set to 0 to disable debouncing.
@@ -1027,6 +1035,10 @@ fn merge_settings(settings: &mut LanguageSettings, src: &LanguageSettingsContent
     }
 
     merge(&mut settings.tab_size, src.tab_size);
+    settings.tab_size = settings
+        .tab_size
+        .clamp(NonZeroU32::new(1).unwrap(), NonZeroU32::new(16).unwrap());
+
     merge(&mut settings.hard_tabs, src.hard_tabs);
     merge(&mut settings.soft_wrap, src.soft_wrap);
     merge(&mut settings.use_autoclose, src.use_autoclose);
