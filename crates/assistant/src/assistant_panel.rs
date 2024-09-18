@@ -12,7 +12,7 @@ use crate::{
     slash_command_picker,
     terminal_inline_assistant::TerminalInlineAssistant,
     Assist, CacheStatus, ConfirmCommand, Content, Context, ContextEvent, ContextId, ContextStore,
-    ContextStoreEvent, CopySelection, CycleMessageRole, DeployHistory, DeployPromptLibrary,
+    ContextStoreEvent, CopyCode, CycleMessageRole, DeployHistory, DeployPromptLibrary,
     InlineAssistId, InlineAssistant, InsertDraggedFiles, InsertIntoEditor, Message, MessageId,
     MessageMetadata, MessageStatus, ModelPickerDelegate, ModelSelector, NewContext,
     PendingSlashCommand, PendingSlashCommandStatus, QuoteSelection, RemoteContextMetadata,
@@ -107,7 +107,7 @@ pub fn init(cx: &mut AppContext) {
                 .register_action(AssistantPanel::inline_assist)
                 .register_action(ContextEditor::quote_selection)
                 .register_action(ContextEditor::insert_selection)
-                .register_action(ContextEditor::copy_selection)
+                .register_action(ContextEditor::copy_code)
                 .register_action(ContextEditor::insert_dragged_files)
                 .register_action(AssistantPanel::show_configuration)
                 .register_action(AssistantPanel::create_new_context);
@@ -3159,26 +3159,42 @@ impl ContextEditor {
         None
     }
 
-    /// return selected text
-    /// or if selection is empty, return the code block where the cursor currently sits
-    /// or empty string
+    /// return selected text,
+    ///  or if selection is empty, the code block where the cursor currently sits
+    ///  or empty string
     fn get_selection_or_code_block(
         context_editor_view: &View<ContextEditor>,
         cx: &mut ViewContext<Workspace>,
     ) -> (String, bool) {
         let context_editor = context_editor_view.read(cx).editor.read(cx);
         let anchor = &context_editor.selections.newest_anchor();
-        let buffer = context_editor.buffer().read(cx).read(cx);
-
+        let mut text;
         let mut is_code_block = false;
-        let mut text = buffer.text_for_range(anchor.range()).collect::<String>();
+        let mut range = None;
 
-        if text.is_empty() {
-            let cursor_row = anchor.start.to_point(&buffer).row;
-            if let Some(range) = Self::find_code_block(&buffer, cursor_row) {
-                text = buffer.text_for_range(range).collect::<String>();
-                is_code_block = true;
+        {
+            let buffer = context_editor.buffer().read(cx).read(cx);
+            text = buffer.text_for_range(anchor.range()).collect::<String>();
+            if text.is_empty() {
+                let cursor_row = anchor.start.to_point(&buffer).row;
+                if let Some(rng) = Self::find_code_block(&buffer, cursor_row) {
+                    text = buffer.text_for_range(rng.clone()).collect::<String>();
+                    range = Some(rng);
+                }
             }
+        }
+
+        if let Some(range) = range {
+            is_code_block = true;
+            context_editor_view
+                .read(cx)
+                .editor
+                .clone()
+                .update(cx, |editor, cx| {
+                    editor.change_selections(Some(Autoscroll::fit()), cx, |s| {
+                        s.select_ranges([range]);
+                    });
+                });
         }
 
         (text, is_code_block)
@@ -3213,11 +3229,7 @@ impl ContextEditor {
         }
     }
 
-    fn copy_selection(
-        workspace: &mut Workspace,
-        _: &CopySelection,
-        cx: &mut ViewContext<Workspace>,
-    ) {
+    fn copy_code(workspace: &mut Workspace, _: &CopyCode, cx: &mut ViewContext<Workspace>) {
         let Some(panel) = workspace.panel::<AssistantPanel>(cx) else {
             return;
         };
@@ -3229,17 +3241,20 @@ impl ContextEditor {
 
         if !text.is_empty() {
             cx.write_to_clipboard(ClipboardItem::new_string(text));
-            if is_code_block {
-                struct CopyCodeBlockToast;
-                workspace.show_toast(
-                    Toast::new(
-                        NotificationId::unique::<CopyCodeBlockToast>(),
-                        "Code block copied to clipboard",
-                    )
-                    .autohide(),
-                    cx,
-                );
-            }
+            struct CopyToClipboardToast;
+            let what = if is_code_block {
+                "Code block"
+            } else {
+                "Selection"
+            };
+            workspace.show_toast(
+                Toast::new(
+                    NotificationId::unique::<CopyToClipboardToast>(),
+                    format!("{} copied to clipboard.", what),
+                )
+                .autohide(),
+                cx,
+            );
         }
     }
 
