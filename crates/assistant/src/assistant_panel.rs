@@ -45,14 +45,15 @@ use gpui::{
 };
 use indexed_docs::IndexedDocsStore;
 use language::{
-    language_settings::SoftWrap, Capability, LanguageRegistry, LspAdapterDelegate, ToOffset,
+    language_settings::SoftWrap, BufferSnapshot, Capability, LanguageRegistry, LspAdapterDelegate,
+    ToOffset,
 };
 use language_model::{
     provider::cloud::PROVIDER_ID, LanguageModelProvider, LanguageModelProviderId,
     LanguageModelRegistry, Role,
 };
 use language_model::{LanguageModelImage, LanguageModelToolUse};
-use multi_buffer::{MultiBufferRow, MultiBufferSnapshot};
+use multi_buffer::MultiBufferRow;
 use picker::{Picker, PickerDelegate};
 use project::lsp_store::LocalLspAdapterDelegate;
 use project::{Project, Worktree};
@@ -3103,101 +3104,47 @@ impl ContextEditor {
         });
     }
 
-    /// find the start and end row of code block enclosed by CODE_BLOCK_DELIMITER
-    /// where cursor currently sits
-    fn find_code_block(buffer: &MultiBufferSnapshot, cursor: u32) -> Option<Range<Point>> {
-        const CODE_BLOCK_DELIMITER: &str = "```";
-
-        let mut block_start = None;
-        let mut block_end = None;
-        let nrows = buffer.max_point().row;
-        // if cursor is in bottom half of buffer, search in reverse
-        let (rows, reverse) = if cursor > nrows << 1 {
-            (nrows..=0, true)
-        } else {
-            (0..=nrows, false)
-        };
-
-        for row in rows {
-            let line =
-                if let Some((buffer, range)) = buffer.buffer_line_for_row(MultiBufferRow(row)) {
-                    buffer
-                        .text_for_range(range)
-                        .collect::<String>()
-                        .trim()
-                        .to_string()
-                } else {
-                    String::new()
-                };
-
-            if line.starts_with(CODE_BLOCK_DELIMITER) {
-                if block_start.is_some() {
-                    if block_end.is_some() {
-                        block_start = Some(row);
-                        block_end = None;
-                    } else {
-                        block_end = Some(row);
-                    }
-                } else {
-                    block_start = Some(row);
-                }
-            }
-            if let Some(a) = block_start {
-                if let Some(b) = block_end {
-                    let x = a.min(b);
-                    let y = a.max(b);
-                    if x <= cursor && cursor <= y {
-                        return Some(Point::new((x + 1).min(y), 0)..Point::new(y, 0));
-                    }
-                    // went past cursor
-                    if reverse && cursor > y || !reverse && cursor < x {
-                        return None;
-                    }
-                }
-            }
-        }
-        None
-    }
-
-    /// return selected text,
-    ///  or if selection is empty, the code block where the cursor currently sits
-    ///  or empty string
+    /// Returns either the selected text, or the content of the Markdown code
+    /// block surrounding the cursor.
     fn get_selection_or_code_block(
         context_editor_view: &View<ContextEditor>,
         cx: &mut ViewContext<Workspace>,
-    ) -> (String, bool) {
+    ) -> Option<(String, bool)> {
+        const CODE_FENCE_DELIMITER: &'static str = "```";
+
         let context_editor = context_editor_view.read(cx).editor.read(cx);
-        let anchor = &context_editor.selections.newest_anchor();
-        let mut text;
-        let mut is_code_block = false;
-        let mut range = None;
 
-        {
-            let buffer = context_editor.buffer().read(cx).read(cx);
-            text = buffer.text_for_range(anchor.range()).collect::<String>();
-            if text.is_empty() {
-                let cursor_row = anchor.start.to_point(&buffer).row;
-                if let Some(rng) = Self::find_code_block(&buffer, cursor_row) {
-                    text = buffer.text_for_range(rng.clone()).collect::<String>();
-                    range = Some(rng);
-                }
+        if context_editor.selections.newest::<Point>(cx).is_empty() {
+            let snapshot = context_editor.buffer().read(cx).snapshot(cx);
+            let (_, _, snapshot) = snapshot.as_singleton()?;
+
+            let head = context_editor.selections.newest::<Point>(cx).head();
+            let offset = snapshot.point_to_offset(head);
+
+            let surrounding_code_block_range = find_surrounding_code_block(snapshot, offset)?;
+            let mut text = snapshot
+                .text_for_range(surrounding_code_block_range)
+                .collect::<String>();
+
+            // If there is no newline trailing the closing three-backticks, then
+            // tree-sitter-md extends the range of the content node to include
+            // the backticks.
+            if text.ends_with(CODE_FENCE_DELIMITER) {
+                text.drain((text.len() - CODE_FENCE_DELIMITER.len())..);
             }
-        }
 
-        if let Some(range) = range {
-            is_code_block = true;
-            context_editor_view
+            (!text.is_empty()).then_some((text, true))
+        } else {
+            let anchor = context_editor.selections.newest_anchor();
+            let text = context_editor
+                .buffer()
                 .read(cx)
-                .editor
-                .clone()
-                .update(cx, |editor, cx| {
-                    editor.change_selections(Some(Autoscroll::fit()), cx, |s| {
-                        s.select_ranges([range]);
-                    });
-                });
-        }
+                .read(cx)
+                .text_for_range(anchor.range())
+                .collect::<String>();
 
-        (text, is_code_block)
+            (!text.is_empty()).then_some((text, false))
+        }
     }
 
     fn insert_selection(
@@ -3218,10 +3165,7 @@ impl ContextEditor {
             return;
         };
 
-        let (text, _) = Self::get_selection_or_code_block(&context_editor_view, cx);
-
-        // If nothing is selected, don't delete the current selection; instead, be a no-op.
-        if !text.is_empty() {
+        if let Some((text, _)) = Self::get_selection_or_code_block(&context_editor_view, cx) {
             active_editor_view.update(cx, |editor, cx| {
                 editor.insert(&text, cx);
                 editor.focus(cx);
@@ -3230,32 +3174,33 @@ impl ContextEditor {
     }
 
     fn copy_code(workspace: &mut Workspace, _: &CopyCode, cx: &mut ViewContext<Workspace>) {
-        let Some(panel) = workspace.panel::<AssistantPanel>(cx) else {
-            return;
-        };
-        let Some(context_editor_view) = panel.read(cx).active_context_editor(cx) else {
+        let result = maybe!({
+            let panel = workspace.panel::<AssistantPanel>(cx)?;
+            let context_editor_view = panel.read(cx).active_context_editor(cx)?;
+            Self::get_selection_or_code_block(&context_editor_view, cx)
+        });
+        let Some((text, is_code_block)) = result else {
             return;
         };
 
-        let (text, is_code_block) = Self::get_selection_or_code_block(&context_editor_view, cx);
+        cx.write_to_clipboard(ClipboardItem::new_string(text));
 
-        if !text.is_empty() {
-            cx.write_to_clipboard(ClipboardItem::new_string(text));
-            struct CopyToClipboardToast;
-            let what = if is_code_block {
-                "Code block"
-            } else {
-                "Selection"
-            };
-            workspace.show_toast(
-                Toast::new(
-                    NotificationId::unique::<CopyToClipboardToast>(),
-                    format!("{} copied to clipboard.", what),
-                )
-                .autohide(),
-                cx,
-            );
-        }
+        struct CopyToClipboardToast;
+        workspace.show_toast(
+            Toast::new(
+                NotificationId::unique::<CopyToClipboardToast>(),
+                format!(
+                    "{} copied to clipboard.",
+                    if is_code_block {
+                        "Code block"
+                    } else {
+                        "Selection"
+                    }
+                ),
+            )
+            .autohide(),
+            cx,
+        );
     }
 
     fn insert_dragged_files(
@@ -4335,6 +4280,48 @@ impl ContextEditor {
                 focus_handle.dispatch_action(&Assist, cx);
             })
     }
+}
+
+/// Returns the contents of the *outermost* fenced code block that contains the given offset.
+fn find_surrounding_code_block(snapshot: &BufferSnapshot, offset: usize) -> Option<Range<usize>> {
+    const CODE_BLOCK_NODE: &'static str = "fenced_code_block";
+    const CODE_BLOCK_CONTENT: &'static str = "code_fence_content";
+
+    let layer = snapshot.syntax_layers().next()?;
+
+    let root_node = layer.node();
+    let mut cursor = root_node.walk();
+
+    // Go to the first child for the given offset
+    while cursor.goto_first_child_for_byte(offset).is_some() {
+        // If we're at the end of the node, go to the next one.
+        // Example: if you have a fenced-code-block, and you're on the start of the line
+        // right after the closing ```, you want to skip the fenced-code-block and
+        // go to the next sibling.
+        if cursor.node().end_byte() == offset {
+            cursor.goto_next_sibling();
+        }
+
+        if cursor.node().start_byte() > offset {
+            break;
+        }
+
+        // We found the fenced code block.
+        if cursor.node().kind() == CODE_BLOCK_NODE {
+            // Now we need to find the child node that contains the code.
+            cursor.goto_first_child();
+            loop {
+                if cursor.node().kind() == CODE_BLOCK_CONTENT {
+                    return Some(cursor.node().byte_range());
+                }
+                if !cursor.goto_next_sibling() {
+                    break;
+                }
+            }
+        }
+    }
+
+    None
 }
 
 fn render_fold_icon_button(
@@ -5618,4 +5605,86 @@ fn configuration_error(cx: &AppContext) -> Option<ConfigurationError> {
     }
 
     None
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use gpui::{AppContext, Context};
+    use language::Buffer;
+    use unindent::Unindent;
+
+    #[gpui::test]
+    fn test_find_code_blocks(cx: &mut AppContext) {
+        let markdown = languages::language("markdown", tree_sitter_md::LANGUAGE.into());
+
+        let buffer = cx.new_model(|cx| {
+            let text = r#"
+                line 0
+                line 1
+                ```rust
+                fn main() {}
+                ```
+                line 5
+                line 6
+                line 7
+                ```go
+                func main() {}
+                ```
+                line 11
+                ```
+                this is plain text code block
+                ```
+
+                ```go
+                func another() {}
+                ```
+                line 19
+            "#
+            .unindent();
+            let mut buffer = Buffer::local(text, cx);
+            buffer.set_language(Some(markdown.clone()), cx);
+            buffer
+        });
+        let snapshot = buffer.read(cx).snapshot();
+
+        let code_blocks = vec![
+            Point::new(3, 0)..Point::new(4, 0),
+            Point::new(9, 0)..Point::new(10, 0),
+            Point::new(13, 0)..Point::new(14, 0),
+            Point::new(17, 0)..Point::new(18, 0),
+        ]
+        .into_iter()
+        .map(|range| snapshot.point_to_offset(range.start)..snapshot.point_to_offset(range.end))
+        .collect::<Vec<_>>();
+
+        let expected_results = vec![
+            (0, None),
+            (1, None),
+            (2, Some(code_blocks[0].clone())),
+            (3, Some(code_blocks[0].clone())),
+            (4, Some(code_blocks[0].clone())),
+            (5, None),
+            (6, None),
+            (7, None),
+            (8, Some(code_blocks[1].clone())),
+            (9, Some(code_blocks[1].clone())),
+            (10, Some(code_blocks[1].clone())),
+            (11, None),
+            (12, Some(code_blocks[2].clone())),
+            (13, Some(code_blocks[2].clone())),
+            (14, Some(code_blocks[2].clone())),
+            (15, None),
+            (16, Some(code_blocks[3].clone())),
+            (17, Some(code_blocks[3].clone())),
+            (18, Some(code_blocks[3].clone())),
+            (19, None),
+        ];
+
+        for (row, expected) in expected_results {
+            let offset = snapshot.point_to_offset(Point::new(row, 0));
+            let range = find_surrounding_code_block(&snapshot, offset);
+            assert_eq!(range, expected, "unexpected result on row {:?}", row);
+        }
+    }
 }

@@ -133,8 +133,8 @@ impl RenderOnce for Tab {
             .bg(tab_bg)
             .border_1()
             .border_t_2()
-            .border_color(cx.theme().colors().border)
-            .rounded_t(px(6.))
+            .border_color(cx.theme().colors().border_disabled)
+            .rounded_t(px(5.))
             .map(|this| match self.selected {
                 true => this
                     .border_color(cx.theme().colors().text_accent)
