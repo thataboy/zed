@@ -49,6 +49,8 @@ pub struct Deploy {
     pub replace_enabled: bool,
     #[serde(default)]
     pub selection_search_enabled: bool,
+    #[serde(default)]
+    pub silent: bool,
 }
 
 impl_actions!(buffer_search, [Deploy]);
@@ -61,6 +63,7 @@ impl Deploy {
             focus: true,
             replace_enabled: false,
             selection_search_enabled: false,
+            silent: false,
         }
     }
 }
@@ -563,7 +566,10 @@ impl BufferSearchBar {
     }
 
     pub fn deploy(&mut self, deploy: &Deploy, cx: &mut ViewContext<Self>) -> bool {
-        if self.show(cx) {
+        if deploy.silent {
+            self.search_suggested(cx);
+            return true;
+        } else if self.show(cx) {
             if let Some(active_item) = self.active_searchable_item.as_mut() {
                 active_item.toggle_filtered_search_ranges(deploy.selection_search_enabled, cx);
             }
@@ -582,12 +588,10 @@ impl BufferSearchBar {
                 if select_query {
                     self.select_query(cx);
                 }
-
                 cx.focus(&handle);
             }
             return true;
         }
-
         false
     }
 
@@ -2180,6 +2184,7 @@ mod tests {
                 focus: true,
                 replace_enabled: false,
                 selection_search_enabled: true,
+                silent: false,
             };
             search_bar.deploy(&deploy, cx);
         });
@@ -2264,6 +2269,7 @@ mod tests {
                 focus: true,
                 replace_enabled: false,
                 selection_search_enabled: true,
+                silent: false,
             };
             search_bar.deploy(&deploy, cx);
         });
