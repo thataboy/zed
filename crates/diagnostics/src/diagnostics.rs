@@ -785,7 +785,7 @@ fn diagnostic_header_renderer(diagnostic: Diagnostic) -> RenderBlock {
         let highlight_style: HighlightStyle = cx.theme().colors().text_accent.into();
         h_flex()
             .id(DIAGNOSTIC_HEADER)
-            .h(2. * cx.line_height())
+            .h(1.3 * cx.line_height())
             .pl_10()
             .pr_5()
             .w_full()

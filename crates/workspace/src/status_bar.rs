@@ -42,6 +42,9 @@ impl Render for StatusBar {
             .py(Spacing::XSmall.rems(cx))
             .px(Spacing::Large.rems(cx))
             .bg(cx.theme().colors().status_bar_background)
+            .border_1()
+            .rounded_b_lg()
+            .border_color(cx.theme().colors().border_disabled)
             .map(|el| match cx.window_decorations() {
                 Decorations::Server => el,
                 Decorations::Client { tiling, .. } => el
@@ -50,11 +53,7 @@ impl Render for StatusBar {
                     })
                     .when(!(tiling.bottom || tiling.left), |el| {
                         el.rounded_bl(CLIENT_SIDE_DECORATION_ROUNDING)
-                    })
-                    // This border is to avoid a transparent gap in the rounded corners
-                    .mb(px(-1.))
-                    .border_b(px(1.0))
-                    .border_color(cx.theme().colors().status_bar_background),
+                    }),
             })
             .child(self.render_left_tools(cx))
             .child(self.render_right_tools(cx))

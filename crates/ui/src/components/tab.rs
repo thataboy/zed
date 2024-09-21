@@ -131,19 +131,12 @@ impl RenderOnce for Tab {
         self.div
             .h(rems(Self::CONTAINER_HEIGHT_IN_REMS))
             .bg(tab_bg)
-            .border_1()
-            .border_t_2()
-            .border_color(cx.theme().colors().border_disabled)
-            .rounded_t(px(5.))
+            .mx_px()
             .map(|this| match self.selected {
                 true => this
                     .border_color(cx.theme().colors().text_accent)
-                    .border_l_2()
-                    .border_r_2()
-                    .border_b_0()
-                    .pb(px(2.))
-                    .pl(px(-1.))
-                    .pr(px(-1.)),
+                    .border_t_2()
+                    .pt(px(-2.)),
                 _ => this,
             })
             .cursor_pointer()

@@ -638,7 +638,7 @@ impl Item for Editor {
             .child(
                 Label::new(self.title(cx).to_string())
                     .color(label_color)
-                    .size(LabelSize::Large)
+                    .size(LabelSize::Default)
                     .italic(params.preview),
             )
             .when_some(description, |this, description| {

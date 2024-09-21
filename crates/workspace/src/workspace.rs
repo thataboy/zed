@@ -4758,9 +4758,9 @@ impl Render for Workspace {
                         .flex()
                         .flex_col()
                         .overflow_hidden()
-                        .border_t_1()
-                        .border_b_1()
-                        .border_color(colors.border)
+                        .border_l_1()
+                        .border_r_1()
+                        .border_color(colors.border_disabled)
                         .child({
                             let this = cx.view().clone();
                             canvas(
