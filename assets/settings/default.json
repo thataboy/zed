@@ -298,6 +298,8 @@
     "include_ignored": false,
     "regex": false
   },
+  // Whether to clear search matches when moving the cursor via mouse or keyboard
+  "clear_search_matches_on_cursor_move": false,
   // When to populate a new search's query based on the text under the cursor.
   // This setting can take the following three values:
   //

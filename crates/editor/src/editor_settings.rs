@@ -32,6 +32,7 @@ pub struct EditorSettings {
     pub search_wrap: bool,
     #[serde(default)]
     pub search: SearchSettings,
+    pub clear_search_matches_on_cursor_move: bool,
     pub auto_signature_help: bool,
     pub show_signature_help_after_edits: bool,
     pub jupyter: Jupyter,
@@ -277,6 +278,11 @@ pub struct EditorSettingsContent {
     ///
     /// Default: nothing is enabled
     pub search: Option<SearchSettings>,
+
+    /// Whether to clear search matches when moving the cursor via mouse or keyboard
+    ///
+    /// Default: false
+    pub clear_search_matches_on_cursor_move: Option<bool>,
 
     /// Whether to automatically show a signature help pop-up or not.
     ///
