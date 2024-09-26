@@ -68,10 +68,9 @@ use element::LineWithInvisibles;
 pub use element::{
     CursorLayout, EditorElement, HighlightedRange, HighlightedRangeLine, PointForPosition,
 };
-use futures::FutureExt;
+use futures::{future, FutureExt};
 use fuzzy::{StringMatch, StringMatchCandidate};
 use git::blame::GitBlame;
-use git::diff_hunk_to_display;
 use gpui::{
     div, impl_actions, point, prelude::*, px, relative, size, uniform_list, Action, AnyElement,
     AppContext, AsyncWindowContext, AvailableSpace, BackgroundExecutor, Bounds, ClipboardEntry,
@@ -84,8 +83,8 @@ use gpui::{
 };
 use highlight_matching_bracket::refresh_matching_bracket_highlights;
 use hover_popover::{hide_hover, HoverState};
-use hunk_diff::ExpandedHunks;
 pub(crate) use hunk_diff::HoveredHunk;
+use hunk_diff::{diff_hunk_to_display, ExpandedHunks};
 use indent_guides::ActiveIndentGuidesState;
 use inlay_hint_cache::{InlayHintCache, InlaySplice, InvalidationStrategy};
 pub use inline_completion_provider::*;
@@ -99,7 +98,9 @@ use language::{
 };
 use language::{point_to_lsp, BufferRow, CharClassifier, Runnable, RunnableRange};
 use linked_editing_ranges::refresh_linked_ranges;
-use proposed_changes_editor::{ProposedChangesBuffer, ProposedChangesEditor};
+pub use proposed_changes_editor::{
+    ProposedChangesBuffer, ProposedChangesEditor, ProposedChangesEditorToolbar,
+};
 use similar::{ChangeTag, TextDiff};
 use task::{ResolvedTask, TaskTemplate, TaskVariables};
 
@@ -122,8 +123,8 @@ use ordered_float::OrderedFloat;
 use parking_lot::{Mutex, RwLock};
 use project::project_settings::{GitGutterSetting, ProjectSettings};
 use project::{
-    CodeAction, Completion, CompletionIntent, FormatTrigger, Item, Location, Project, ProjectPath,
-    ProjectTransaction, TaskSourceKind,
+    lsp_store::FormatTrigger, CodeAction, Completion, CompletionIntent, Item, Location, Project,
+    ProjectPath, ProjectTransaction, TaskSourceKind,
 };
 use rand::prelude::*;
 use rpc::{proto::*, ErrorExt};
@@ -155,7 +156,7 @@ use theme::{
 };
 use ui::{
     h_flex, prelude::*, ButtonSize, ButtonStyle, Disclosure, IconButton, IconName, IconSize,
-    ListItem, Popover, Tooltip,
+    ListItem, Popover, PopoverMenuHandle, Tooltip,
 };
 use util::{defer, maybe, post_inc, RangeExt, ResultExt, TryFutureExt};
 use workspace::item::{ItemHandle, PreviewTabsSettings};
@@ -565,14 +566,15 @@ pub struct Editor {
     nav_history: Option<ItemNavHistory>,
     context_menu: RwLock<Option<ContextMenu>>,
     mouse_context_menu: Option<MouseContextMenu>,
+    hunk_controls_menu_handle: PopoverMenuHandle<ui::ContextMenu>,
     completion_tasks: Vec<(CompletionId, Task<Option<()>>)>,
     signature_help_state: SignatureHelpState,
     auto_signature_help: Option<bool>,
     find_all_references_task_sources: Vec<Anchor>,
     next_completion_id: CompletionId,
     completion_documentation_pre_resolve_debounce: DebouncedDelay,
-    available_code_actions: Option<(Location, Arc<[CodeAction]>)>,
-    code_actions_task: Option<Task<()>>,
+    available_code_actions: Option<(Location, Arc<[AvailableCodeAction]>)>,
+    code_actions_task: Option<Task<Result<()>>>,
     document_highlights_task: Option<Task<()>>,
     linked_editing_range_task: Option<Task<Option<()>>>,
     linked_edit_ranges: linked_editing_ranges::LinkedEditingRanges,
@@ -592,6 +594,7 @@ pub struct Editor {
     gutter_hovered: bool,
     hovered_link_state: Option<HoveredLinkState>,
     inline_completion_provider: Option<RegisteredInlineCompletionProvider>,
+    code_action_providers: Vec<Arc<dyn CodeActionProvider>>,
     active_inline_completion: Option<CompletionState>,
     // enable_inline_completions is a switch that Vim can use to disable
     // inline completions based on its mode.
@@ -662,7 +665,7 @@ pub struct EditorSnapshot {
     show_git_diff_gutter: Option<bool>,
     show_code_actions: Option<bool>,
     show_runnables: Option<bool>,
-    render_git_blame_gutter: bool,
+    git_blame_gutter_max_author_length: Option<usize>,
     pub display_snapshot: DisplaySnapshot,
     pub placeholder_text: Option<Arc<str>>,
     is_focused: bool,
@@ -672,7 +675,7 @@ pub struct EditorSnapshot {
     gutter_hovered: bool,
 }
 
-const GIT_BLAME_GUTTER_WIDTH_CHARS: f32 = 53.;
+const GIT_BLAME_MAX_AUTHOR_CHARS_DISPLAYED: usize = 20;
 
 #[derive(Default, Debug, Clone, Copy)]
 pub struct GutterDimensions {
@@ -1362,10 +1365,16 @@ impl CompletionsMenu {
     }
 }
 
+struct AvailableCodeAction {
+    excerpt_id: ExcerptId,
+    action: CodeAction,
+    provider: Arc<dyn CodeActionProvider>,
+}
+
 #[derive(Clone)]
 struct CodeActionContents {
     tasks: Option<Arc<ResolvedTasks>>,
-    actions: Option<Arc<[CodeAction]>>,
+    actions: Option<Arc<[AvailableCodeAction]>>,
 }
 
 impl CodeActionContents {
@@ -1397,9 +1406,11 @@ impl CodeActionContents {
                     .map(|(kind, task)| CodeActionsItem::Task(kind.clone(), task.clone()))
             })
             .chain(self.actions.iter().flat_map(|actions| {
-                actions
-                    .iter()
-                    .map(|action| CodeActionsItem::CodeAction(action.clone()))
+                actions.iter().map(|available| CodeActionsItem::CodeAction {
+                    excerpt_id: available.excerpt_id,
+                    action: available.action.clone(),
+                    provider: available.provider.clone(),
+                })
             }))
     }
     fn get(&self, index: usize) -> Option<CodeActionsItem> {
@@ -1412,10 +1423,13 @@ impl CodeActionContents {
                         .cloned()
                         .map(|(kind, task)| CodeActionsItem::Task(kind, task))
                 } else {
-                    actions
-                        .get(index - tasks.templates.len())
-                        .cloned()
-                        .map(CodeActionsItem::CodeAction)
+                    actions.get(index - tasks.templates.len()).map(|available| {
+                        CodeActionsItem::CodeAction {
+                            excerpt_id: available.excerpt_id,
+                            action: available.action.clone(),
+                            provider: available.provider.clone(),
+                        }
+                    })
                 }
             }
             (Some(tasks), None) => tasks
@@ -1423,7 +1437,15 @@ impl CodeActionContents {
                 .get(index)
                 .cloned()
                 .map(|(kind, task)| CodeActionsItem::Task(kind, task)),
-            (None, Some(actions)) => actions.get(index).cloned().map(CodeActionsItem::CodeAction),
+            (None, Some(actions)) => {
+                actions
+                    .get(index)
+                    .map(|available| CodeActionsItem::CodeAction {
+                        excerpt_id: available.excerpt_id,
+                        action: available.action.clone(),
+                        provider: available.provider.clone(),
+                    })
+            }
             (None, None) => None,
         }
     }
@@ -1433,7 +1455,11 @@ impl CodeActionContents {
 #[derive(Clone)]
 enum CodeActionsItem {
     Task(TaskSourceKind, ResolvedTask),
-    CodeAction(CodeAction),
+    CodeAction {
+        excerpt_id: ExcerptId,
+        action: CodeAction,
+        provider: Arc<dyn CodeActionProvider>,
+    },
 }
 
 impl CodeActionsItem {
@@ -1444,14 +1470,14 @@ impl CodeActionsItem {
         Some(task)
     }
     fn as_code_action(&self) -> Option<&CodeAction> {
-        let Self::CodeAction(action) = self else {
+        let Self::CodeAction { action, .. } = self else {
             return None;
         };
         Some(action)
     }
     fn label(&self) -> String {
         match self {
-            Self::CodeAction(action) => action.lsp_action.title.clone(),
+            Self::CodeAction { action, .. } => action.lsp_action.title.clone(),
             Self::Task(_, task) => task.resolved_label.clone(),
         }
     }
@@ -1590,7 +1616,9 @@ impl CodeActionsMenu {
                 .enumerate()
                 .max_by_key(|(_, action)| match action {
                     CodeActionsItem::Task(_, task) => task.resolved_label.chars().count(),
-                    CodeActionsItem::CodeAction(action) => action.lsp_action.title.chars().count(),
+                    CodeActionsItem::CodeAction { action, .. } => {
+                        action.lsp_action.title.chars().count()
+                    }
                 })
                 .map(|(ix, _)| ix),
         )
@@ -1866,6 +1894,11 @@ impl Editor {
             None
         };
 
+        let mut code_action_providers = Vec::new();
+        if let Some(project) = project.clone() {
+            code_action_providers.push(Arc::new(project) as Arc<_>);
+        }
+
         let mut this = Self {
             focus_handle,
             show_cursor_when_unfocused: false,
@@ -1910,6 +1943,7 @@ impl Editor {
             nav_history: None,
             context_menu: RwLock::new(None),
             mouse_context_menu: None,
+            hunk_controls_menu_handle: PopoverMenuHandle::default(),
             completion_tasks: Default::default(),
             signature_help_state: SignatureHelpState::default(),
             auto_signature_help: None,
@@ -1917,6 +1951,7 @@ impl Editor {
             next_completion_id: 0,
             completion_documentation_pre_resolve_debounce: DebouncedDelay::new(),
             next_inlay_id: 0,
+            code_action_providers,
             available_code_actions: Default::default(),
             code_actions_task: Default::default(),
             document_highlights_task: Default::default(),
@@ -2178,6 +2213,19 @@ impl Editor {
     }
 
     pub fn snapshot(&mut self, cx: &mut WindowContext) -> EditorSnapshot {
+        let git_blame_gutter_max_author_length = self
+            .render_git_blame_gutter(cx)
+            .then(|| {
+                if let Some(blame) = self.blame.as_ref() {
+                    let max_author_length =
+                        blame.update(cx, |blame, cx| blame.max_author_length(cx));
+                    Some(max_author_length)
+                } else {
+                    None
+                }
+            })
+            .flatten();
+
         EditorSnapshot {
             mode: self.mode,
             show_gutter: self.show_gutter,
@@ -2185,7 +2233,7 @@ impl Editor {
             show_git_diff_gutter: self.show_git_diff_gutter,
             show_code_actions: self.show_code_actions,
             show_runnables: self.show_runnables,
-            render_git_blame_gutter: self.render_git_blame_gutter(cx),
+            git_blame_gutter_max_author_length,
             display_snapshot: self.display_map.update(cx, |map, cx| map.snapshot(cx)),
             scroll_anchor: self.scroll_manager.anchor(),
             ongoing_scroll: self.scroll_manager.ongoing_scroll(),
@@ -3419,7 +3467,7 @@ impl Editor {
                 s.select(new_selections)
             });
 
-            if !bracket_inserted && EditorSettings::get_global(cx).use_on_type_format {
+            if !bracket_inserted {
                 if let Some(on_type_format_task) =
                     this.trigger_on_type_formatting(text.to_string(), cx)
                 {
@@ -4168,6 +4216,15 @@ impl Editor {
             .read(cx)
             .text_anchor_for_position(position, cx)?;
 
+        let settings = language_settings::language_settings(
+            buffer.read(cx).language_at(buffer_position).as_ref(),
+            buffer.read(cx).file(),
+            cx,
+        );
+        if !settings.use_on_type_format {
+            return None;
+        }
+
         // OnTypeFormatting returns a list of edits, no need to pass them between Zed instances,
         // hence we do LSP request & edit on host side only — add formats to host's history.
         let push_to_lsp_host_history = true;
@@ -4565,7 +4622,7 @@ impl Editor {
         let action = action.clone();
         cx.spawn(|editor, mut cx| async move {
             while let Some(prev_task) = task {
-                prev_task.await;
+                prev_task.await.log_err();
                 task = editor.update(&mut cx, |this, _| this.code_actions_task.take())?;
             }
 
@@ -4739,17 +4796,16 @@ impl Editor {
                     Some(Task::ready(Ok(())))
                 })
             }
-            CodeActionsItem::CodeAction(action) => {
-                let apply_code_actions = workspace
-                    .read(cx)
-                    .project()
-                    .clone()
-                    .update(cx, |project, cx| {
-                        project.apply_code_action(buffer, action, true, cx)
-                    });
+            CodeActionsItem::CodeAction {
+                excerpt_id,
+                action,
+                provider,
+            } => {
+                let apply_code_action =
+                    provider.apply_code_action(buffer, action, excerpt_id, true, cx);
                 let workspace = workspace.downgrade();
                 Some(cx.spawn(|editor, cx| async move {
-                    let project_transaction = apply_code_actions.await?;
+                    let project_transaction = apply_code_action.await?;
                     Self::open_project_transaction(
                         &editor,
                         workspace,
@@ -4847,8 +4903,16 @@ impl Editor {
         Ok(())
     }
 
+    pub fn push_code_action_provider(
+        &mut self,
+        provider: Arc<dyn CodeActionProvider>,
+        cx: &mut ViewContext<Self>,
+    ) {
+        self.code_action_providers.push(provider);
+        self.refresh_code_actions(cx);
+    }
+
     fn refresh_code_actions(&mut self, cx: &mut ViewContext<Self>) -> Option<()> {
-        let project = self.project.clone()?;
         let buffer = self.buffer.read(cx);
         let newest_selection = self.selections.newest_anchor().clone();
         let (start_buffer, start) = buffer.text_anchor_for_position(newest_selection.start, cx)?;
@@ -4862,13 +4926,30 @@ impl Editor {
                 .timer(CODE_ACTIONS_DEBOUNCE_TIMEOUT)
                 .await;
 
-            let actions = if let Ok(code_actions) = project.update(&mut cx, |project, cx| {
-                project.code_actions(&start_buffer, start..end, cx)
-            }) {
-                code_actions.await
-            } else {
-                Vec::new()
-            };
+            let (providers, tasks) = this.update(&mut cx, |this, cx| {
+                let providers = this.code_action_providers.clone();
+                let tasks = this
+                    .code_action_providers
+                    .iter()
+                    .map(|provider| provider.code_actions(&start_buffer, start..end, cx))
+                    .collect::<Vec<_>>();
+                (providers, tasks)
+            })?;
+
+            let mut actions = Vec::new();
+            for (provider, provider_actions) in
+                providers.into_iter().zip(future::join_all(tasks).await)
+            {
+                if let Some(provider_actions) = provider_actions.log_err() {
+                    actions.extend(provider_actions.into_iter().map(|action| {
+                        AvailableCodeAction {
+                            excerpt_id: newest_selection.start.excerpt_id,
+                            action,
+                            provider: provider.clone(),
+                        }
+                    }));
+                }
+            }
 
             this.update(&mut cx, |this, cx| {
                 this.available_code_actions = if actions.is_empty() {
@@ -4884,7 +4965,6 @@ impl Editor {
                 };
                 cx.notify();
             })
-            .log_err();
         }));
         None
     }
@@ -5339,23 +5419,6 @@ impl Editor {
                     cx,
                 );
             }))
-    }
-
-    fn close_hunk_diff_button(
-        &self,
-        hunk: HoveredHunk,
-        row: DisplayRow,
-        cx: &mut ViewContext<Self>,
-    ) -> IconButton {
-        IconButton::new(
-            ("close_hunk_diff_indicator", row.0 as usize),
-            ui::IconName::Close,
-        )
-        .shape(ui::IconButtonShape::Square)
-        .icon_size(IconSize::XSmall)
-        .icon_color(Color::Muted)
-        .tooltip(|cx| Tooltip::for_action("Close hunk diff", &ToggleHunkDiff, cx))
-        .on_click(cx.listener(move |editor, _e, cx| editor.toggle_hovered_hunk(&hunk, cx)))
     }
 
     pub fn context_menu_visible(&self) -> bool {
@@ -9403,32 +9466,42 @@ impl Editor {
         }
     }
 
-    fn go_to_hunk(&mut self, _: &GoToHunk, cx: &mut ViewContext<Self>) {
+    fn go_to_next_hunk(&mut self, _: &GoToHunk, cx: &mut ViewContext<Self>) {
         let snapshot = self
             .display_map
             .update(cx, |display_map, cx| display_map.snapshot(cx));
         let selection = self.selections.newest::<Point>(cx);
+        self.go_to_hunk_after_position(&snapshot, selection.head(), cx);
+    }
 
-        if !self.seek_in_direction(
-            &snapshot,
-            selection.head(),
+    fn go_to_hunk_after_position(
+        &mut self,
+        snapshot: &DisplaySnapshot,
+        position: Point,
+        cx: &mut ViewContext<'_, Editor>,
+    ) -> Option<MultiBufferDiffHunk> {
+        if let Some(hunk) = self.go_to_next_hunk_in_direction(
+            snapshot,
+            position,
             false,
-            snapshot.buffer_snapshot.git_diff_hunks_in_range(
-                MultiBufferRow(selection.head().row + 1)..MultiBufferRow::MAX,
-            ),
+            snapshot
+                .buffer_snapshot
+                .git_diff_hunks_in_range(MultiBufferRow(position.row + 1)..MultiBufferRow::MAX),
             cx,
         ) {
-            let wrapped_point = Point::zero();
-            self.seek_in_direction(
-                &snapshot,
-                wrapped_point,
-                true,
-                snapshot.buffer_snapshot.git_diff_hunks_in_range(
-                    MultiBufferRow(wrapped_point.row + 1)..MultiBufferRow::MAX,
-                ),
-                cx,
-            );
+            return Some(hunk);
         }
+
+        let wrapped_point = Point::zero();
+        self.go_to_next_hunk_in_direction(
+            snapshot,
+            wrapped_point,
+            true,
+            snapshot.buffer_snapshot.git_diff_hunks_in_range(
+                MultiBufferRow(wrapped_point.row + 1)..MultiBufferRow::MAX,
+            ),
+            cx,
+        )
     }
 
     fn go_to_prev_hunk(&mut self, _: &GoToPrevHunk, cx: &mut ViewContext<Self>) {
@@ -9437,52 +9510,65 @@ impl Editor {
             .update(cx, |display_map, cx| display_map.snapshot(cx));
         let selection = self.selections.newest::<Point>(cx);
 
-        if !self.seek_in_direction(
-            &snapshot,
-            selection.head(),
-            false,
-            snapshot.buffer_snapshot.git_diff_hunks_in_range_rev(
-                MultiBufferRow(0)..MultiBufferRow(selection.head().row),
-            ),
-            cx,
-        ) {
-            let wrapped_point = snapshot.buffer_snapshot.max_point();
-            self.seek_in_direction(
-                &snapshot,
-                wrapped_point,
-                true,
-                snapshot.buffer_snapshot.git_diff_hunks_in_range_rev(
-                    MultiBufferRow(0)..MultiBufferRow(wrapped_point.row),
-                ),
-                cx,
-            );
-        }
+        self.go_to_hunk_before_position(&snapshot, selection.head(), cx);
     }
 
-    fn seek_in_direction(
+    fn go_to_hunk_before_position(
+        &mut self,
+        snapshot: &DisplaySnapshot,
+        position: Point,
+        cx: &mut ViewContext<'_, Editor>,
+    ) -> Option<MultiBufferDiffHunk> {
+        if let Some(hunk) = self.go_to_next_hunk_in_direction(
+            snapshot,
+            position,
+            false,
+            snapshot
+                .buffer_snapshot
+                .git_diff_hunks_in_range_rev(MultiBufferRow(0)..MultiBufferRow(position.row)),
+            cx,
+        ) {
+            return Some(hunk);
+        }
+
+        let wrapped_point = snapshot.buffer_snapshot.max_point();
+        self.go_to_next_hunk_in_direction(
+            snapshot,
+            wrapped_point,
+            true,
+            snapshot
+                .buffer_snapshot
+                .git_diff_hunks_in_range_rev(MultiBufferRow(0)..MultiBufferRow(wrapped_point.row)),
+            cx,
+        )
+    }
+
+    fn go_to_next_hunk_in_direction(
         &mut self,
         snapshot: &DisplaySnapshot,
         initial_point: Point,
         is_wrapped: bool,
         hunks: impl Iterator<Item = MultiBufferDiffHunk>,
         cx: &mut ViewContext<Editor>,
-    ) -> bool {
+    ) -> Option<MultiBufferDiffHunk> {
         let display_point = initial_point.to_display_point(snapshot);
         let mut hunks = hunks
-            .map(|hunk| diff_hunk_to_display(&hunk, snapshot))
-            .filter(|hunk| is_wrapped || !hunk.contains_display_row(display_point.row()))
+            .map(|hunk| (diff_hunk_to_display(&hunk, snapshot), hunk))
+            .filter(|(display_hunk, _)| {
+                is_wrapped || !display_hunk.contains_display_row(display_point.row())
+            })
             .dedup();
 
-        if let Some(hunk) = hunks.next() {
+        if let Some((display_hunk, hunk)) = hunks.next() {
             self.change_selections(Some(Autoscroll::fit()), cx, |s| {
-                let row = hunk.start_display_row();
+                let row = display_hunk.start_display_row();
                 let point = DisplayPoint::new(row, 0);
                 s.select_display_ranges([point..point]);
             });
 
-            true
+            Some(hunk)
         } else {
-            false
+            None
         }
     }
 
@@ -9807,7 +9893,7 @@ impl Editor {
                     })
                     .context("location tasks preparation")?;
 
-                let locations = futures::future::join_all(location_tasks)
+                let locations = future::join_all(location_tasks)
                     .await
                     .into_iter()
                     .filter_map(|location| location.transpose())
@@ -11583,7 +11669,7 @@ impl Editor {
         &'a self,
         position: Anchor,
         buffer: &'a MultiBufferSnapshot,
-    ) -> impl 'a + Iterator<Item = &Range<Anchor>> {
+    ) -> impl 'a + Iterator<Item = &'a Range<Anchor>> {
         let read_highlights = self
             .background_highlights
             .get(&TypeId::of::<DocumentHighlightRead>())
@@ -11888,7 +11974,7 @@ impl Editor {
                             .filter_map(|buffer| {
                                 let buffer = buffer.read(cx);
                                 let language = buffer.language()?;
-                                if project.is_local_or_ssh()
+                                if project.is_local()
                                     && project.language_servers_for_buffer(buffer, cx).count() == 0
                                 {
                                     None
@@ -11984,12 +12070,19 @@ impl Editor {
             )),
             cx,
         );
-        let editor_settings = EditorSettings::get_global(cx);
-        if let Some(cursor_shape) = editor_settings.cursor_shape {
-            self.cursor_shape = cursor_shape;
+
+        let old_cursor_shape = self.cursor_shape;
+
+        {
+            let editor_settings = EditorSettings::get_global(cx);
+            self.scroll_manager.vertical_scroll_margin = editor_settings.vertical_scroll_margin;
+            self.show_breadcrumbs = editor_settings.toolbar.breadcrumbs;
+            self.cursor_shape = editor_settings.cursor_shape.unwrap_or_default();
         }
-        self.scroll_manager.vertical_scroll_margin = editor_settings.vertical_scroll_margin;
-        self.show_breadcrumbs = editor_settings.toolbar.breadcrumbs;
+
+        if old_cursor_shape != self.cursor_shape {
+            cx.emit(EditorEvent::CursorShapeChanged);
+        }
 
         let project_settings = ProjectSettings::get_global(cx);
         self.serialize_dirty_buffers = project_settings.session.restore_unsaved_buffers;
@@ -12541,11 +12634,6 @@ impl Editor {
         Some(gpui::Point::new(source_x, source_y))
     }
 
-    fn gutter_bounds(&self) -> Option<Bounds<Pixels>> {
-        let bounds = self.last_bounds?;
-        Some(element::gutter_bounds(bounds, self.gutter_dimensions))
-    }
-
     pub fn has_active_completions_menu(&self) -> bool {
         self.context_menu.read().as_ref().map_or(false, |menu| {
             menu.visible() && matches!(menu, ContextMenu::Completions(_))
@@ -12694,6 +12782,48 @@ pub trait CompletionProvider {
 
     fn sort_completions(&self) -> bool {
         true
+    }
+}
+
+pub trait CodeActionProvider {
+    fn code_actions(
+        &self,
+        buffer: &Model<Buffer>,
+        range: Range<text::Anchor>,
+        cx: &mut WindowContext,
+    ) -> Task<Result<Vec<CodeAction>>>;
+
+    fn apply_code_action(
+        &self,
+        buffer_handle: Model<Buffer>,
+        action: CodeAction,
+        excerpt_id: ExcerptId,
+        push_to_history: bool,
+        cx: &mut WindowContext,
+    ) -> Task<Result<ProjectTransaction>>;
+}
+
+impl CodeActionProvider for Model<Project> {
+    fn code_actions(
+        &self,
+        buffer: &Model<Buffer>,
+        range: Range<text::Anchor>,
+        cx: &mut WindowContext,
+    ) -> Task<Result<Vec<CodeAction>>> {
+        self.update(cx, |project, cx| project.code_actions(buffer, range, cx))
+    }
+
+    fn apply_code_action(
+        &self,
+        buffer_handle: Model<Buffer>,
+        action: CodeAction,
+        _excerpt_id: ExcerptId,
+        push_to_history: bool,
+        cx: &mut WindowContext,
+    ) -> Task<Result<ProjectTransaction>> {
+        self.update(cx, |project, cx| {
+            project.apply_code_action(buffer_handle, action, push_to_history, cx)
+        })
     }
 }
 
@@ -12962,6 +13092,7 @@ impl EditorSnapshot {
         font_id: FontId,
         font_size: Pixels,
         em_width: Pixels,
+        em_advance: Pixels,
         max_line_number_width: Pixels,
         cx: &AppContext,
     ) -> GutterDimensions {
@@ -12982,7 +13113,7 @@ impl EditorSnapshot {
             .unwrap_or(gutter_settings.line_numbers);
         let line_gutter_width = if show_line_numbers {
             // Avoid flicker-like gutter resizes when the line number gains another digit and only resize the gutter on files with N*10^5 lines.
-            let min_width_for_number_on_gutter = em_width * 4.0;
+            let min_width_for_number_on_gutter = em_advance * 4.0;
             max_line_number_width.max(min_width_for_number_on_gutter)
         } else {
             0.0.into()
@@ -12994,9 +13125,19 @@ impl EditorSnapshot {
 
         let show_runnables = self.show_runnables.unwrap_or(gutter_settings.runnables);
 
-        let git_blame_entries_width = self
-            .render_git_blame_gutter
-            .then_some(em_width * GIT_BLAME_GUTTER_WIDTH_CHARS);
+        let git_blame_entries_width =
+            self.git_blame_gutter_max_author_length
+                .map(|max_author_length| {
+                    // Length of the author name, but also space for the commit hash,
+                    // the spacing and the timestamp.
+                    let max_char_count = max_author_length
+                        .min(GIT_BLAME_MAX_AUTHOR_CHARS_DISPLAYED)
+                        + 7 // length of commit sha
+                        + 14 // length of max relative timestamp ("60 minutes ago")
+                        + 4; // gaps and margins
+
+                    em_advance * max_char_count
+                });
 
         let mut left_padding = git_blame_entries_width.unwrap_or(Pixels::ZERO);
         left_padding += if show_code_actions || show_runnables {
@@ -13149,6 +13290,7 @@ pub enum EditorEvent {
     TransactionBegun {
         transaction_id: clock::Lamport,
     },
+    CursorShapeChanged,
 }
 
 impl EventEmitter<EditorEvent> for Editor {}

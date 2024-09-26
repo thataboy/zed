@@ -172,6 +172,8 @@ pub struct ThemeColors {
     /// the background color of its range.
     pub editor_document_highlight_write_background: Hsla,
     /// Highlighted brackets background color.
+    ///
+    /// Matching brackets in the cursor scope are highlighted with this background color.
     pub editor_document_highlight_bracket_background: Hsla,
 
     // ===
