@@ -2360,6 +2360,7 @@ mod tests {
             focus: true,
             replace_enabled: false,
             selection_search_enabled: true,
+            silent: false,
         };
 
         search_bar.update(cx, |search_bar, cx| {
