@@ -392,7 +392,8 @@ impl Editor {
                         .child(
                             h_flex()
                                 .size_full()
-                                .justify_between()
+                                // .justify_between()
+                                .justify_start()
                                 .border_t_1()
                                 .border_color(border_color)
                                 .child(
@@ -524,7 +525,8 @@ impl Editor {
                                 )
                                 .child(
                                     h_flex()
-                                        .gap_2()
+                                        .gap_4()
+                                        .pl_6()
                                         .pr_6()
                                         .child({
                                             let focus = editor.focus_handle(cx);

@@ -4221,67 +4221,67 @@ impl ContextEditor {
         }
     }
 
-    fn render_send_button(&self, cx: &mut ViewContext<Self>) -> impl IntoElement {
-        let focus_handle = self.focus_handle(cx).clone();
-        let button_text = match self.active_workflow_step() {
-            Some((_, step)) => match step.status(cx) {
-                WorkflowStepStatus::Error(_) => "Retry Step Resolution",
-                WorkflowStepStatus::Resolving => "Transform",
-                WorkflowStepStatus::Idle => "Transform",
-                WorkflowStepStatus::Pending => "Applying...",
-                WorkflowStepStatus::Done => "Accept",
-                WorkflowStepStatus::Confirmed => "Send",
-            },
-            None => "Send",
-        };
+    // fn render_send_button(&self, cx: &mut ViewContext<Self>) -> impl IntoElement {
+    //     let focus_handle = self.focus_handle(cx).clone();
+    //     let button_text = match self.active_workflow_step() {
+    //         Some((_, step)) => match step.status(cx) {
+    //             WorkflowStepStatus::Error(_) => "Retry Step Resolution",
+    //             WorkflowStepStatus::Resolving => "Transform",
+    //             WorkflowStepStatus::Idle => "Transform",
+    //             WorkflowStepStatus::Pending => "Applying...",
+    //             WorkflowStepStatus::Done => "Accept",
+    //             WorkflowStepStatus::Confirmed => "Send",
+    //         },
+    //         None => "Send",
+    //     };
 
-        let (style, tooltip) = match token_state(&self.context, cx) {
-            Some(TokenState::NoTokensLeft { .. }) => (
-                ButtonStyle::Tinted(TintColor::Negative),
-                Some(Tooltip::text("Token limit reached", cx)),
-            ),
-            Some(TokenState::HasMoreTokens {
-                over_warn_threshold,
-                ..
-            }) => {
-                let (style, tooltip) = if over_warn_threshold {
-                    (
-                        ButtonStyle::Tinted(TintColor::Warning),
-                        Some(Tooltip::text("Token limit is close to exhaustion", cx)),
-                    )
-                } else {
-                    (ButtonStyle::Filled, None)
-                };
-                (style, tooltip)
-            }
-            None => (ButtonStyle::Filled, None),
-        };
+    //     let (style, tooltip) = match token_state(&self.context, cx) {
+    //         Some(TokenState::NoTokensLeft { .. }) => (
+    //             ButtonStyle::Tinted(TintColor::Negative),
+    //             Some(Tooltip::text("Token limit reached", cx)),
+    //         ),
+    //         Some(TokenState::HasMoreTokens {
+    //             over_warn_threshold,
+    //             ..
+    //         }) => {
+    //             let (style, tooltip) = if over_warn_threshold {
+    //                 (
+    //                     ButtonStyle::Tinted(TintColor::Warning),
+    //                     Some(Tooltip::text("Token limit is close to exhaustion", cx)),
+    //                 )
+    //             } else {
+    //                 (ButtonStyle::Filled, None)
+    //             };
+    //             (style, tooltip)
+    //         }
+    //         None => (ButtonStyle::Filled, None),
+    //     };
 
-        let provider = LanguageModelRegistry::read_global(cx).active_provider();
+    //     let provider = LanguageModelRegistry::read_global(cx).active_provider();
 
-        let has_configuration_error = configuration_error(cx).is_some();
-        let needs_to_accept_terms = self.show_accept_terms
-            && provider
-                .as_ref()
-                .map_or(false, |provider| provider.must_accept_terms(cx));
-        let disabled = has_configuration_error || needs_to_accept_terms;
+    //     let has_configuration_error = configuration_error(cx).is_some();
+    //     let needs_to_accept_terms = self.show_accept_terms
+    //         && provider
+    //             .as_ref()
+    //             .map_or(false, |provider| provider.must_accept_terms(cx));
+    //     let disabled = has_configuration_error || needs_to_accept_terms;
 
-        ButtonLike::new("send_button")
-            .disabled(disabled)
-            .style(style)
-            .when_some(tooltip, |button, tooltip| {
-                button.tooltip(move |_| tooltip.clone())
-            })
-            .layer(ElevationIndex::ModalSurface)
-            .child(Label::new(button_text))
-            .children(
-                KeyBinding::for_action_in(&Assist, &focus_handle, cx)
-                    .map(|binding| binding.into_any_element()),
-            )
-            .on_click(move |_event, cx| {
-                focus_handle.dispatch_action(&Assist, cx);
-            })
-    }
+    //     ButtonLike::new("send_button")
+    //         .disabled(disabled)
+    //         .style(style)
+    //         .when_some(tooltip, |button, tooltip| {
+    //             button.tooltip(move |_| tooltip.clone())
+    //         })
+    //         .layer(ElevationIndex::ModalSurface)
+    //         .child(Label::new(button_text))
+    //         .children(
+    //             KeyBinding::for_action_in(&Assist, &focus_handle, cx)
+    //                 .map(|binding| binding.into_any_element()),
+    //         )
+    //         .on_click(move |_event, cx| {
+    //             focus_handle.dispatch_action(&Assist, cx);
+    //         })
+    // }
 }
 
 /// Returns the contents of the *outermost* fenced code block that contains the given offset.
@@ -4377,13 +4377,13 @@ impl Render for ContextEditor {
         } else {
             None
         };
-        let focus_handle = self
-            .workspace
-            .update(cx, |workspace, cx| {
-                Some(workspace.active_item_as::<Editor>(cx)?.focus_handle(cx))
-            })
-            .ok()
-            .flatten();
+        // let focus_handle = self
+        //     .workspace
+        //     .update(cx, |workspace, cx| {
+        //         Some(workspace.active_item_as::<Editor>(cx)?.focus_handle(cx))
+        //     })
+        //     .ok()
+        //     .flatten();
         v_flex()
             .key_context("ContextEditor")
             .capture_action(cx.listener(ContextEditor::cancel))
@@ -4460,48 +4460,49 @@ impl Render for ContextEditor {
                         ),
                 )
             })
-            .child(
-                h_flex().w_full().relative().child(
-                    h_flex()
-                        .p_2()
-                        .w_full()
-                        .border_t_1()
-                        .border_color(cx.theme().colors().border_variant)
-                        .bg(cx.theme().colors().editor_background)
-                        .child(
-                            h_flex()
-                                .gap_2()
-                                .child(render_inject_context_menu(cx.view().downgrade(), cx))
-                                .child(
-                                    IconButton::new("quote-button", IconName::Quote)
-                                        .icon_size(IconSize::Small)
-                                        .on_click(|_, cx| {
-                                            cx.dispatch_action(QuoteSelection.boxed_clone());
-                                        })
-                                        .tooltip(move |cx| {
-                                            cx.new_view(|cx| {
-                                                Tooltip::new("Insert Selection").key_binding(
-                                                    focus_handle.as_ref().and_then(|handle| {
-                                                        KeyBinding::for_action_in(
-                                                            &QuoteSelection,
-                                                            &handle,
-                                                            cx,
-                                                        )
-                                                    }),
-                                                )
-                                            })
-                                            .into()
-                                        }),
-                                ),
-                        )
-                        .child(
-                            h_flex()
-                                .w_full()
-                                .justify_end()
-                                .child(div().child(self.render_send_button(cx))),
-                        ),
-                ),
-            )
+        // .child(
+        //     h_flex().w_full().relative().child(
+        //         h_flex()
+        //             .px_2()
+        //             .py_2()
+        //             .w_full()
+        //             .border_t_1()
+        //             .border_color(cx.theme().colors().border_variant)
+        //             .bg(cx.theme().colors().editor_background)
+        //             .child(
+        //                 h_flex()
+        //                     .gap_2()
+        //                     .child(render_inject_context_menu(cx.view().downgrade(), cx))
+        //                     .child(
+        //                         IconButton::new("quote-button", IconName::Quote)
+        //                             .icon_size(IconSize::Small)
+        //                             .on_click(|_, cx| {
+        //                                 cx.dispatch_action(QuoteSelection.boxed_clone());
+        //                             })
+        //                             .tooltip(move |cx| {
+        //                                 cx.new_view(|cx| {
+        //                                     Tooltip::new("Insert Selection").key_binding(
+        //                                         focus_handle.as_ref().and_then(|handle| {
+        //                                             KeyBinding::for_action_in(
+        //                                                 &QuoteSelection,
+        //                                                 &handle,
+        //                                                 cx,
+        //                                             )
+        //                                         }),
+        //                                     )
+        //                                 })
+        //                                 .into()
+        //                             }),
+        //                     ),
+        //             )
+        //             .child(
+        //                 h_flex()
+        //                     .w_full()
+        //                     .justify_end()
+        //                     .child(div().child(self.render_send_button(cx))),
+        //             ),
+        //     ),
+        // )
     }
 }
 
@@ -4761,22 +4762,22 @@ fn active_editor_focus_handle(
     })
 }
 
-fn render_inject_context_menu(
-    active_context_editor: WeakView<ContextEditor>,
-    cx: &mut WindowContext<'_>,
-) -> impl IntoElement {
-    let commands = SlashCommandRegistry::global(cx);
+// fn render_inject_context_menu(
+//     active_context_editor: WeakView<ContextEditor>,
+//     cx: &mut WindowContext<'_>,
+// ) -> impl IntoElement {
+//     let commands = SlashCommandRegistry::global(cx);
 
-    slash_command_picker::SlashCommandSelector::new(
-        commands.clone(),
-        active_context_editor,
-        IconButton::new("trigger", IconName::SlashSquare)
-            .icon_size(IconSize::Small)
-            .tooltip(|cx| {
-                Tooltip::with_meta("Insert Context", None, "Type / to insert via keyboard", cx)
-            }),
-    )
-}
+//     slash_command_picker::SlashCommandSelector::new(
+//         commands.clone(),
+//         active_context_editor,
+//         IconButton::new("trigger", IconName::SlashSquare)
+//             .icon_size(IconSize::Small)
+//             .tooltip(|cx| {
+//                 Tooltip::with_meta("Insert Context", None, "Type / to insert via keyboard", cx)
+//             }),
+//     )
+// }
 
 impl ContextEditorToolbarItem {
     pub fn new(

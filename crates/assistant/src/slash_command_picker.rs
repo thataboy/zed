@@ -55,19 +55,19 @@ pub(crate) struct SlashCommandDelegate {
     selected_index: usize,
 }
 
-impl<T: PopoverTrigger> SlashCommandSelector<T> {
-    pub(crate) fn new(
-        registry: Arc<SlashCommandRegistry>,
-        active_context_editor: WeakView<ContextEditor>,
-        trigger: T,
-    ) -> Self {
-        SlashCommandSelector {
-            registry,
-            active_context_editor,
-            trigger,
-        }
-    }
-}
+// impl<T: PopoverTrigger> SlashCommandSelector<T> {
+//     pub(crate) fn new(
+//         registry: Arc<SlashCommandRegistry>,
+//         active_context_editor: WeakView<ContextEditor>,
+//         trigger: T,
+//     ) -> Self {
+//         SlashCommandSelector {
+//             registry,
+//             active_context_editor,
+//             trigger,
+//         }
+//     }
+// }
 
 impl PickerDelegate for SlashCommandDelegate {
     type ListItem = ListItem;

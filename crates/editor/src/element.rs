@@ -2140,7 +2140,8 @@ impl EditorElement {
                                 .border_1()
                                 .border_color(cx.theme().colors().border_variant)
                                 .bg(cx.theme().colors().editor_subheader_background)
-                                .justify_between()
+                                .justify_center()
+                                .gap_16()
                                 .hover(|style| style.bg(cx.theme().colors().element_hover))
                                 .child(
                                     h_flex().gap_3().child(
