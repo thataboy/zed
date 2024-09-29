@@ -3047,7 +3047,13 @@ impl EditorElement {
                             layout.position_map.line_height
                                 * highlight_row_end.next_row().minus(highlight_row_start) as f32,
                         );
-                        cx.paint_quad(fill(Bounds { origin, size }, color));
+                        cx.paint_quad(quad(
+                            Bounds { origin, size },
+                            Corners::all(Pixels(5.)),
+                            color,
+                            Edges::all(Pixels(1.)),
+                            cx.theme().colors().border_selected,
+                        ));
                     };
 
                 let mut current_paint: Option<(Hsla, Range<DisplayRow>)> = None;
