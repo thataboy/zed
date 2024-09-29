@@ -166,12 +166,22 @@ pub struct ThemeColors {
     /// special attention. Usually a document highlight is visualized by changing
     /// the background color of its range.
     pub editor_document_highlight_read_background: Hsla,
-    /// Read-access of a symbol, like reading a variable.
+    /// Alternative to editor_document_highlight_read_background
+    ///
+    /// If set, highlight read-access of a symbol by underlining
+    /// instead of changing the background color.
+    pub editor_document_highlight_read_underline: Hsla,
+    /// Write-access of a symbol, like writing a variable.
     ///
     /// A document highlight is a range inside a text document which deserves
     /// special attention. Usually a document highlight is visualized by changing
     /// the background color of its range.
     pub editor_document_highlight_write_background: Hsla,
+    /// Alternative to editor_document_highlight_write_background
+    ///
+    /// If set, highlight write-access of a symbol by underlining
+    /// instead of changing the background color.
+    pub editor_document_highlight_write_underline: Hsla,
     /// Highlighted brackets background color.
     ///
     /// Matching brackets in the cursor scope are highlighted with this background color.

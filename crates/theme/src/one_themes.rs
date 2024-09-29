@@ -102,7 +102,9 @@ pub(crate) fn one_dark() -> Theme {
                     66. / 100.,
                     0.2,
                 ),
+                editor_document_highlight_read_underline: gpui::transparent_black(),
                 editor_document_highlight_write_background: gpui::red(),
+                editor_document_highlight_write_underline: gpui::transparent_black(),
                 editor_document_highlight_bracket_background: gpui::green(),
 
                 terminal_background: bg,

@@ -5072,27 +5072,61 @@ impl Editor {
                             }
                         }
                     }
-
-                    this.highlight_background::<DocumentHighlightRead>(
-                        &read_ranges,
-                        |theme| {
-                            (
-                                theme.editor_document_highlight_read_background,
-                                Hsla::transparent_black(),
-                            )
-                        },
-                        cx,
-                    );
-                    this.highlight_background::<DocumentHighlightWrite>(
-                        &write_ranges,
-                        |theme| {
-                            (
-                                theme.editor_document_highlight_write_background,
-                                Hsla::transparent_black(),
-                            )
-                        },
-                        cx,
-                    );
+                    let color = cx.theme().colors().editor_document_highlight_read_underline;
+                    if color.a > 0. {
+                        this.highlight_text::<DocumentHighlightRead>(
+                            read_ranges,
+                            HighlightStyle {
+                                underline: Some(UnderlineStyle {
+                                    thickness: px(1.),
+                                    color: Some(color),
+                                    wavy: false,
+                                }),
+                                ..Default::default()
+                            },
+                            cx,
+                        );
+                    } else {
+                        this.highlight_background::<DocumentHighlightRead>(
+                            &read_ranges,
+                            |theme| {
+                                (
+                                    theme.editor_document_highlight_read_background,
+                                    Hsla::transparent_black(),
+                                )
+                            },
+                            cx,
+                        );
+                    }
+                    let color = cx
+                        .theme()
+                        .colors()
+                        .editor_document_highlight_write_underline;
+                    if color.a > 0. {
+                        this.highlight_text::<DocumentHighlightWrite>(
+                            write_ranges,
+                            HighlightStyle {
+                                underline: Some(UnderlineStyle {
+                                    thickness: px(1.),
+                                    color: Some(color),
+                                    wavy: false,
+                                }),
+                                ..Default::default()
+                            },
+                            cx,
+                        );
+                    } else {
+                        this.highlight_background::<DocumentHighlightWrite>(
+                            &write_ranges,
+                            |theme| {
+                                (
+                                    theme.editor_document_highlight_write_background,
+                                    Hsla::transparent_black(),
+                                )
+                            },
+                            cx,
+                        );
+                    }
                     cx.notify();
                 })
                 .log_err();

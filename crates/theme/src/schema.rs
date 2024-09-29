@@ -408,13 +408,27 @@ pub struct ThemeColorsContent {
     #[serde(rename = "editor.document_highlight.read_background")]
     pub editor_document_highlight_read_background: Option<String>,
 
-    /// Read-access of a symbol, like reading a variable.
+    /// Alternative to editor_document_highlight_read_background
+    ///
+    /// If set, highlight read-access of a symbol by underlining
+    /// instead of changing the background color.
+    #[serde(rename = "editor.document_highlight.read_underline")]
+    pub editor_document_highlight_read_underline: Option<String>,
+
+    /// Write-access of a symbol, like writing a variable.
     ///
     /// A document highlight is a range inside a text document which deserves
     /// special attention. Usually a document highlight is visualized by changing
     /// the background color of its range.
     #[serde(rename = "editor.document_highlight.write_background")]
     pub editor_document_highlight_write_background: Option<String>,
+
+    /// Alternative to editor_document_highlight_write_background
+    ///
+    /// If set, highlight write-access of a symbol by underlining
+    /// instead of changing the background color.
+    #[serde(rename = "editor.document_highlight.write_underline")]
+    pub editor_document_highlight_write_underline: Option<String>,
 
     /// Highlighted brackets background color.
     ///
@@ -802,8 +816,16 @@ impl ThemeColorsContent {
                 .as_ref()
                 .and_then(|color| try_parse_color(color).ok()),
             editor_document_highlight_read_background,
+            editor_document_highlight_read_underline: self
+                .editor_document_highlight_read_underline
+                .as_ref()
+                .and_then(|color| try_parse_color(color).ok()),
             editor_document_highlight_write_background: self
                 .editor_document_highlight_write_background
+                .as_ref()
+                .and_then(|color| try_parse_color(color).ok()),
+            editor_document_highlight_write_underline: self
+                .editor_document_highlight_write_underline
                 .as_ref()
                 .and_then(|color| try_parse_color(color).ok()),
             editor_document_highlight_bracket_background: self
