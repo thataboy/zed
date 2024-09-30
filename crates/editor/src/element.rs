@@ -2133,7 +2133,7 @@ impl EditorElement {
                             h_flex()
                                 .flex_basis(Length::Definite(DefiniteLength::Fraction(0.667)))
                                 .id("path header block")
-                                .h(1.3 * cx.line_height())
+                                .h(1.2 * cx.line_height())
                                 .px(gpui::px(12.))
                                 .rounded_md()
                                 .shadow_md()
