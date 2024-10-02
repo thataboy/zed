@@ -2674,9 +2674,9 @@ impl ProjectPanel {
                 }))
                 .h_full()
                 .absolute()
-                .right_0()
-                .top_0()
-                .bottom_0()
+                .right_1()
+                .top_1()
+                .bottom_1()
                 .w(px(12.))
                 .cursor_default()
                 .child(ProjectPanelScrollbar::vertical(

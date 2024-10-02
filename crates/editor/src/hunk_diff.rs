@@ -424,6 +424,8 @@ impl Editor {
                         )
                         .child(
                             h_flex()
+                                .pl_2()
+                                .pr_6()
                                 .size_full()
                                 .justify_start()
                                 .border_t_1()
