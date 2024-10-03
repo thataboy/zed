@@ -4998,6 +4998,7 @@ impl Render for ContextEditorToolbarItem {
 
         h_flex()
             .size_full()
+            .h(px(24.))
             .gap_2()
             .justify_between()
             .child(left_side)

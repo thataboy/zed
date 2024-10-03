@@ -97,7 +97,8 @@ impl Render for Toolbar {
 
         v_flex()
             .group("toolbar")
-            .p(Spacing::Large.rems(cx))
+            .px(Spacing::Large.rems(cx))
+            .py(Spacing::Small.rems(cx))
             .when(has_left_items || has_right_items, |this| {
                 this.gap(Spacing::Large.rems(cx))
             })
@@ -107,7 +108,7 @@ impl Render for Toolbar {
             .when(has_left_items || has_right_items, |this| {
                 this.child(
                     h_flex()
-                        .min_h(rems_from_px(24.))
+                        .min_h(rems_from_px(18.))
                         .justify_between()
                         .gap(Spacing::Large.rems(cx))
                         .when(has_left_items, |this| {

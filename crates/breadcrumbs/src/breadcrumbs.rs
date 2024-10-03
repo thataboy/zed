@@ -78,7 +78,9 @@ impl Render for Breadcrumbs {
                 .into_any()
         });
         let breadcrumbs = Itertools::intersperse_with(highlighted_segments, || {
-            Label::new("›").color(Color::Placeholder).into_any_element()
+            Label::new("\u{276F}")
+                .color(Color::Placeholder)
+                .into_any_element()
         });
 
         let breadcrumbs_stack = h_flex().gap_1().children(breadcrumbs);
@@ -89,6 +91,7 @@ impl Render for Breadcrumbs {
             Some(editor) => element.child(
                 ButtonLike::new("toggle outline view")
                     .child(breadcrumbs_stack)
+                    .size(ButtonSize::Default)
                     .style(ButtonStyle::Transparent)
                     .on_click({
                         let editor = editor.clone();
@@ -118,7 +121,7 @@ impl Render for Breadcrumbs {
             ),
             None => element
                 // Match the height of the `ButtonLike` in the other arm.
-                .h(rems_from_px(22.))
+                .h(rems_from_px(18.))
                 .child(breadcrumbs_stack),
         }
     }
