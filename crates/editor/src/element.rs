@@ -110,7 +110,7 @@ impl SelectionLayout {
             && !selection.reversed
         {
             if head.column() > 0 {
-                head = map.clip_point(DisplayPoint::new(head.row(), head.column() - 1), Bias::Left)
+                head = map.clip_point(DisplayPoint::new(head.row(), head.column()), Bias::Left)
             } else if head.row().0 > 0 && head != map.max_point() {
                 head = map.clip_point(
                     DisplayPoint::new(
