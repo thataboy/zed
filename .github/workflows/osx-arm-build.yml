@@ -1,0 +1,30 @@
+name: OSX ARM Build
+
+on:
+  push:
+    branches:
+      - private
+
+jobs:
+  build:
+    runs-on: macos-arm64
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      # - name: Install dependencies
+      # run: |
+      # brew install rust
+      # cargo build --release
+
+      - name: Build OSX ARM app bundle
+        run: |
+          # Your script to build the app bundle goes here
+          # Replace with your actual script
+          ./script/bundle-mac -l
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: "Zed Dev"
+          path: target/release/bundle/osx
