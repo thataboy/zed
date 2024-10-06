@@ -4202,10 +4202,10 @@ fn prepaint_gutter_button(
     button: IconButton,
     row: DisplayRow,
     line_height: Pixels,
-    gutter_dimensions: &GutterDimensions,
+    _gutter_dimensions: &GutterDimensions,
     scroll_pixel_position: gpui::Point<Pixels>,
     gutter_hitbox: &Hitbox,
-    rows_with_hunk_bounds: &HashMap<DisplayRow, Bounds<Pixels>>,
+    _rows_with_hunk_bounds: &HashMap<DisplayRow, Bounds<Pixels>>,
     cx: &mut WindowContext<'_>,
 ) -> AnyElement {
     let mut button = button.into_any_element();
@@ -4215,17 +4215,19 @@ fn prepaint_gutter_button(
     );
     let indicator_size = button.layout_as_root(available_space, cx);
 
-    let blame_width = gutter_dimensions.git_blame_entries_width;
-    let gutter_width = rows_with_hunk_bounds
-        .get(&row)
-        .map(|bounds| bounds.size.width);
-    let left_offset = blame_width.max(gutter_width).unwrap_or_default();
+    // let blame_width = gutter_dimensions.git_blame_entries_width;
+    // let gutter_width = rows_with_hunk_bounds
+    //     .get(&row)
+    //     .map(|bounds| bounds.size.width);
+    // let left_offset = blame_width.max(gutter_width).unwrap_or_default();
 
-    let mut x = left_offset;
-    let available_width = gutter_dimensions.margin + gutter_dimensions.left_padding
-        - indicator_size.width
-        - left_offset;
-    x += available_width / 2.;
+    // let mut x = left_offset;
+    // let available_width = gutter_dimensions.margin + gutter_dimensions.left_padding
+    //     - indicator_size.width
+    //     - left_offset;
+    // x += available_width / 2.;
+
+    let x = line_height / 3.;
 
     let mut y = row.as_f32() * line_height - scroll_pixel_position.y;
     y += (line_height - indicator_size.height) / 2.;

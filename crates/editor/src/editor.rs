@@ -5431,7 +5431,7 @@ impl Editor {
             Some(
                 IconButton::new("code_actions_indicator", ui::IconName::Bolt)
                     .shape(ui::IconButtonShape::Square)
-                    .icon_size(IconSize::XSmall)
+                    .icon_size(IconSize::Small)
                     .icon_color(Color::Muted)
                     .selected(is_active)
                     .tooltip({
@@ -5482,7 +5482,7 @@ impl Editor {
     ) -> IconButton {
         IconButton::new(("run_indicator", row.0 as usize), ui::IconName::Play)
             .shape(ui::IconButtonShape::Square)
-            .icon_size(IconSize::XSmall)
+            .icon_size(IconSize::Small)
             .icon_color(Color::Muted)
             .selected(is_active)
             .on_click(cx.listener(move |editor, _e, cx| {
@@ -13464,18 +13464,18 @@ impl EditorSnapshot {
 
         let mut left_padding = git_blame_entries_width.unwrap_or(Pixels::ZERO);
         left_padding += if show_code_actions || show_runnables {
-            em_width * 3.0
-        } else if show_git_gutter && show_line_numbers {
-            em_width * 2.0
+            if !show_line_numbers && gutter_settings.folds {
+                em_width * 3.0
+            } else {
+                em_width
+            }
         } else if show_git_gutter || show_line_numbers {
             em_width
         } else {
             px(0.)
         };
 
-        let right_padding = if gutter_settings.folds && show_line_numbers {
-            em_width * 4.0
-        } else if gutter_settings.folds {
+        let right_padding = if gutter_settings.folds {
             em_width * 3.0
         } else if show_line_numbers {
             em_width
