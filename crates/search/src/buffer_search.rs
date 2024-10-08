@@ -1,9 +1,10 @@
 mod registrar;
 
 use crate::{
-    search_bar::render_nav_button, FocusSearch, NextHistoryQuery, PreviousHistoryQuery, ReplaceAll,
-    ReplaceNext, SearchOptions, SelectAllMatches, SelectNextMatch, SelectPrevMatch,
-    ToggleCaseSensitive, ToggleRegex, ToggleReplace, ToggleSelection, ToggleWholeWord,
+    search_bar::render_nav_button, FocusSearch, NextHistoryQuery, PreviousHistoryQuery,
+    QuickFindNext, QuickFindPrev, ReplaceAll, ReplaceNext, SearchOptions, SelectAllMatches,
+    SelectNextMatch, SelectPrevMatch, ToggleCaseSensitive, ToggleRegex, ToggleReplace,
+    ToggleSelection, ToggleWholeWord,
 };
 use any_vec::AnyVec;
 use collections::HashMap;
@@ -50,8 +51,6 @@ pub struct Deploy {
     pub replace_enabled: bool,
     #[serde(default)]
     pub selection_search_enabled: bool,
-    #[serde(default)]
-    pub silent: bool,
 }
 
 impl_actions!(buffer_search, [Deploy]);
@@ -64,7 +63,6 @@ impl Deploy {
             focus: true,
             replace_enabled: false,
             selection_search_enabled: false,
-            silent: false,
         }
     }
 }
@@ -101,6 +99,9 @@ pub struct BufferSearchBar {
     scroll_handle: ScrollHandle,
     editor_scroll_handle: ScrollHandle,
     editor_needed_width: Pixels,
+    // >0 => may (un)escape regex as needed
+    // 0 => user has edited the search query, do not (un)escape regex
+    may_escape_query: u8,
 }
 
 impl BufferSearchBar {
@@ -502,7 +503,7 @@ impl ToolbarItemView for BufferSearchBar {
                 ));
 
             self.active_searchable_item = Some(searchable_item_handle);
-            drop(self.update_matches(true, cx));
+            drop(self.update_matches(true, cx, None));
             if !self.dismissed {
                 return ToolbarItemLocation::Secondary;
             }
@@ -536,6 +537,18 @@ impl BufferSearchBar {
             if this.supported_options().replacement {
                 this.toggle_replace(action, cx);
             }
+        }));
+        registrar.register_handler(ForDeployed(|this, action: &QuickFindNext, cx| {
+            this.quick_find_next(action, cx);
+        }));
+        registrar.register_handler(ForDeployed(|this, action: &QuickFindPrev, cx| {
+            this.quick_find_prev(action, cx);
+        }));
+        registrar.register_handler(ForDismissed(|this, action: &QuickFindNext, cx| {
+            this.quick_find_next(action, cx);
+        }));
+        registrar.register_handler(ForDismissed(|this, action: &QuickFindPrev, cx| {
+            this.quick_find_prev(action, cx);
         }));
         registrar.register_handler(WithResults(|this, action: &SelectNextMatch, cx| {
             this.select_next_match(action, cx);
@@ -595,6 +608,7 @@ impl BufferSearchBar {
             scroll_handle: ScrollHandle::new(),
             editor_scroll_handle: ScrollHandle::new(),
             editor_needed_width: px(0.),
+            may_escape_query: 1,
         }
     }
 
@@ -627,10 +641,7 @@ impl BufferSearchBar {
     }
 
     pub fn deploy(&mut self, deploy: &Deploy, cx: &mut ViewContext<Self>) -> bool {
-        if deploy.silent {
-            self.search_suggested(cx);
-            return true;
-        } else if self.show(cx) {
+        if self.show(cx) {
             if let Some(active_item) = self.active_searchable_item.as_mut() {
                 active_item.toggle_filtered_search_ranges(deploy.selection_search_enabled, cx);
             }
@@ -651,6 +662,8 @@ impl BufferSearchBar {
                 }
                 cx.focus(&handle);
             }
+            // indicate regex may be (un)escaped
+            self.may_escape_query = 1;
             return true;
         }
         false
@@ -694,9 +707,12 @@ impl BufferSearchBar {
     }
 
     pub fn search_suggested(&mut self, cx: &mut ViewContext<Self>) {
-        let search = self
-            .query_suggestion(cx)
-            .map(|suggestion| self.search(&suggestion, Some(self.default_options), cx));
+        let search = self.query_suggestion(cx).map(|mut suggestion| {
+            if self.search_options.contains(SearchOptions::REGEX) {
+                suggestion = regex::escape(&suggestion);
+            }
+            self.search(&suggestion, Some(self.search_options), cx)
+        });
 
         if let Some(search) = search {
             cx.spawn(|this, mut cx| async move {
@@ -775,7 +791,7 @@ impl BufferSearchBar {
             self.clear_matches(cx);
             cx.notify();
         }
-        self.update_matches(!updated, cx)
+        self.update_matches(!updated, cx, None)
     }
 
     fn render_search_option_button(
@@ -801,8 +817,7 @@ impl BufferSearchBar {
         cx: &mut ViewContext<Self>,
     ) {
         self.search_options.toggle(search_option);
-        self.default_options = self.search_options;
-        drop(self.update_matches(false, cx));
+        drop(self.update_matches(false, cx, None));
         cx.notify();
     }
 
@@ -827,6 +842,35 @@ impl BufferSearchBar {
     ) {
         self.search_options = search_options;
         cx.notify();
+    }
+
+    fn quick_find_next(&mut self, _: &QuickFindNext, cx: &mut ViewContext<Self>) {
+        self.quick_find(Direction::Next, cx);
+    }
+
+    fn quick_find_prev(&mut self, _: &QuickFindPrev, cx: &mut ViewContext<Self>) {
+        self.quick_find(Direction::Prev, cx);
+    }
+
+    pub fn quick_find(&mut self, direction: Direction, cx: &mut ViewContext<Self>) {
+        self.query_suggestion(cx)
+            .map(|mut suggestion| {
+                if self.search_options.contains(SearchOptions::REGEX) {
+                    suggestion = regex::escape(&suggestion);
+                }
+                self.search(&suggestion, Some(self.default_options), cx)
+            })
+            .and_then(|_| {
+                Some(self.update_matches(
+                    false,
+                    cx,
+                    Some(Box::new(move |this, cx| {
+                        this.select_match(direction, 1, cx)
+                    })),
+                ))
+            });
+        // indicate regex may be (un)escaped
+        self.may_escape_query = 1;
     }
 
     fn select_next_match(&mut self, _: &SelectNextMatch, cx: &mut ViewContext<Self>) {
@@ -903,9 +947,10 @@ impl BufferSearchBar {
             editor::EditorEvent::Focused => self.query_editor_focused = true,
             editor::EditorEvent::Blurred => self.query_editor_focused = false,
             editor::EditorEvent::Edited { .. } => {
+                self.may_escape_query = self.may_escape_query.saturating_sub(1);
                 self.smartcase(cx);
                 self.clear_matches(cx);
-                let search = self.update_matches(false, cx);
+                let search = self.update_matches(false, cx, None);
 
                 let width = editor.update(cx, |editor, cx| {
                     let text_layout_details = editor.text_layout_details(cx);
@@ -943,7 +988,7 @@ impl BufferSearchBar {
     fn on_active_searchable_item_event(&mut self, event: &SearchEvent, cx: &mut ViewContext<Self>) {
         match event {
             SearchEvent::MatchesInvalidated => {
-                drop(self.update_matches(false, cx));
+                drop(self.update_matches(false, cx, None));
             }
             SearchEvent::ActiveMatchChanged => self.update_match_index(cx),
         }
@@ -961,12 +1006,54 @@ impl BufferSearchBar {
         if let Some(active_item) = self.active_searchable_item.as_mut() {
             self.selection_search_enabled = !self.selection_search_enabled;
             active_item.toggle_filtered_search_ranges(self.selection_search_enabled, cx);
-            drop(self.update_matches(false, cx));
+            drop(self.update_matches(false, cx, None));
             cx.notify();
         }
     }
 
+    fn regex_unescape(s: &str) -> String {
+        let special_chars = [
+            '.', '+', '*', '?', '^', '$', '(', ')', '[', ']', '{', '}', '|', '\\',
+        ];
+        let mut result = String::with_capacity(s.len());
+        let mut chars = s.chars().peekable();
+
+        while let Some(c) = chars.next() {
+            if c == '\\' {
+                if let Some(&next) = chars.peek() {
+                    if special_chars.contains(&next) {
+                        result.push(next);
+                        chars.next();
+                    } else {
+                        result.push(c);
+                    }
+                } else {
+                    result.push(c);
+                }
+            } else {
+                result.push(c);
+            }
+        }
+
+        result
+    }
+
     fn toggle_regex(&mut self, _: &ToggleRegex, cx: &mut ViewContext<Self>) {
+        if self.may_escape_query > 0 {
+            // will be reduced to 1 because we'll be triggering edited event
+            // if user later edits the query, it'll be reduced to 0
+            self.may_escape_query = 2;
+            self.query_editor.update(cx, |editor, cx| {
+                let text = if self.search_options.contains(SearchOptions::REGEX) {
+                    // regex about to be turned off, unescape regex special chars
+                    Self::regex_unescape(&editor.text(cx))
+                } else {
+                    // regex about to be turned on, escape regex special chars
+                    regex::escape(&editor.text(cx))
+                };
+                editor.set_text(text, cx);
+            });
+        }
         self.toggle_search_option(SearchOptions::REGEX, cx)
     }
 
@@ -1005,6 +1092,7 @@ impl BufferSearchBar {
         &mut self,
         reuse_existing_query: bool,
         cx: &mut ViewContext<Self>,
+        on_complete: Option<Box<dyn FnOnce(&mut Self, &mut ViewContext<Self>)>>,
     ) -> oneshot::Receiver<()> {
         let (done_tx, done_rx) = oneshot::channel();
         let query = self.query(cx);
@@ -1094,6 +1182,9 @@ impl BufferSearchBar {
                                 let _ = done_tx.send(());
                             }
                             cx.notify();
+                        }
+                        if let Some(callback) = on_complete {
+                            callback(this, cx);
                         }
                     })
                     .log_err();
@@ -2264,7 +2355,6 @@ mod tests {
                 focus: true,
                 replace_enabled: false,
                 selection_search_enabled: true,
-                silent: false,
             };
             search_bar.deploy(&deploy, cx);
         });
@@ -2349,7 +2439,6 @@ mod tests {
                 focus: true,
                 replace_enabled: false,
                 selection_search_enabled: true,
-                silent: false,
             };
             search_bar.deploy(&deploy, cx);
         });
@@ -2423,7 +2512,6 @@ mod tests {
             focus: true,
             replace_enabled: false,
             selection_search_enabled: true,
-            silent: false,
         };
 
         search_bar.update(cx, |search_bar, cx| {

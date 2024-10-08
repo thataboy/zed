@@ -10019,6 +10019,7 @@ dependencies = [
  "language",
  "menu",
  "project",
+ "regex",
  "serde",
  "serde_json",
  "settings",
