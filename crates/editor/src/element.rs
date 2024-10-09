@@ -6204,16 +6204,32 @@ pub struct HighlightedRangeLine {
 
 impl HighlightedRange {
     pub fn paint(&self, bounds: Bounds<Pixels>, cx: &mut WindowContext) {
+        self.paint_lines(self.start_y, &self.lines, bounds, cx);
         if self.lines.len() >= 2 && self.lines[0].start_x > self.lines[1].end_x {
-            self.paint_lines(self.start_y, &self.lines[0..1], bounds, cx);
-            self.paint_lines(
-                self.start_y + self.line_height,
-                &self.lines[1..],
-                bounds,
-                cx,
-            );
-        } else {
-            self.paint_lines(self.start_y, &self.lines, bounds, cx);
+            let origin = gpui::Point {
+                x: self.lines[1].end_x,
+                y: self.start_y + self.line_height,
+            };
+            let size = Size {
+                width: self.lines[0].start_x - self.lines[1].end_x - px(1.),
+                height: px(1.),
+            };
+            let corners = Corners {
+                bottom_right: px(2.),
+                ..Default::default()
+            };
+            let color = if self.border_color.a > 0. {
+                self.border_color
+            } else {
+                self.color
+            };
+            cx.paint_quad(quad(
+                Bounds { origin, size },
+                corners,
+                color,
+                Edges::all(Pixels(1.)),
+                color,
+            ));
         }
     }
 
