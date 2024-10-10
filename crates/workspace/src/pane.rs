@@ -1948,7 +1948,7 @@ impl Pane {
                         .shape(IconButtonShape::Square)
                         .icon_color(Color::Muted)
                         .size(ButtonSize::None)
-                        .icon_size(IconSize::Small)
+                        .icon_size(IconSize::Medium)
                         .on_click(cx.listener(move |pane, _, cx| {
                             pane.unpin_tab_at(ix, cx);
                         }))
@@ -1956,11 +1956,10 @@ impl Pane {
                     end_slot_action = &CloseActiveItem { save_intent: None };
                     end_slot_tooltip_text = "Close Tab";
                     IconButton::new("close tab", IconName::Close)
-                        .visible_on_hover("")
                         .shape(IconButtonShape::Square)
                         .icon_color(Color::Muted)
                         .size(ButtonSize::None)
-                        .icon_size(IconSize::Small)
+                        .icon_size(IconSize::Medium)
                         .on_click(cx.listener(move |pane, _, cx| {
                             pane.close_item_by_id(item_id, SaveIntent::Close, cx)
                                 .detach_and_log_err(cx);

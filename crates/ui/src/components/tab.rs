@@ -119,9 +119,9 @@ impl RenderOnce for Tab {
         };
 
         let (start_slot, end_slot) = {
-            let start_slot = h_flex().size_3().justify_center().children(self.start_slot);
+            let start_slot = h_flex().size_1().justify_center().children(self.start_slot);
 
-            let end_slot = h_flex().size_3().justify_center().children(self.end_slot);
+            let end_slot = h_flex().size_4().justify_center().children(self.end_slot);
 
             match self.close_side {
                 TabCloseSide::End => (start_slot, end_slot),
@@ -137,8 +137,8 @@ impl RenderOnce for Tab {
                 true => this
                     .border_color(cx.theme().colors().text_accent)
                     .border_t_2()
-                    .pt(px(-2.)),
-                _ => this,
+                    .pt(px(-1.)),
+                _ => this.py(px(1.)),
             })
             .cursor_pointer()
             .child(
