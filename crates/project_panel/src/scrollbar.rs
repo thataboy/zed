@@ -1,7 +1,7 @@
 use std::{cell::Cell, ops::Range, rc::Rc};
 
 use gpui::{
-    point, quad, Bounds, ContentMask, Corners, Edges, EntityId, Hitbox, Hsla, MouseDownEvent,
+    point, quad, Bounds, ContentMask, Corners, Edges, EntityId, Hitbox, MouseDownEvent,
     MouseMoveEvent, MouseUpEvent, ScrollWheelEvent, Style, UniformListScrollHandle,
 };
 use ui::{prelude::*, px, relative, IntoElement};
@@ -104,6 +104,9 @@ impl gpui::Element for ProjectPanelScrollbar {
         cx.with_content_mask(Some(ContentMask { bounds }), |cx| {
             let colors = cx.theme().colors();
             let thumb_background = colors.scrollbar_thumb_background;
+            let thumb_border = colors.scrollbar_thumb_border;
+            let scrollbar_background = colors.scrollbar_track_background;
+            cx.paint_quad(gpui::fill(bounds, scrollbar_background));
             let is_vertical = self.kind == ScrollbarKind::Vertical;
             let extra_padding = px(5.0);
             let padded_bounds = if is_vertical {
@@ -126,7 +129,7 @@ impl gpui::Element for ProjectPanelScrollbar {
                     padded_bounds.origin.y + thumb_offset,
                 );
                 let thumb_lower_right = point(
-                    padded_bounds.origin.x + padded_bounds.size.width,
+                    padded_bounds.origin.x + padded_bounds.size.width + extra_padding,
                     padded_bounds.origin.y + thumb_end,
                 );
                 Bounds::from_corners(thumb_upper_left, thumb_lower_right)
@@ -139,7 +142,7 @@ impl gpui::Element for ProjectPanelScrollbar {
                 );
                 let thumb_lower_right = point(
                     padded_bounds.origin.x + thumb_end,
-                    padded_bounds.origin.y + padded_bounds.size.height,
+                    padded_bounds.origin.y + padded_bounds.size.height + extra_padding,
                 );
                 Bounds::from_corners(thumb_upper_left, thumb_lower_right)
             };
@@ -154,8 +157,8 @@ impl gpui::Element for ProjectPanelScrollbar {
                 thumb_bounds,
                 corners,
                 thumb_background,
-                Edges::default(),
-                Hsla::transparent_black(),
+                Edges::all(px(1.)),
+                thumb_border,
             ));
 
             let scroll = self.scroll.clone();

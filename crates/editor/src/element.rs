@@ -1103,7 +1103,6 @@ impl EditorElement {
                         block_width,
                         origin: point(x, y),
                         line_height,
-                        radius: line_height * CURSOR_ROUNDNESS,
                         shape: selection.cursor_shape,
                         block_text,
                         cursor_name: None,
@@ -6047,14 +6046,13 @@ pub struct IndentGuideLayout {
     settings: IndentGuideSettings,
 }
 
-const CURSOR_ROUNDNESS: f32 = 0.125;
-const CURSOR_THICKNESS: f32 = 1.4;
+const CURSOR_ROUNDNESS: Pixels = px(0.1);
+const CURSOR_THICKNESS: Pixels = px(1.5);
 
 pub struct CursorLayout {
     origin: gpui::Point<Pixels>,
     block_width: Pixels,
     line_height: Pixels,
-    radius: Pixels,
     color: Hsla,
     shape: CursorShape,
     block_text: Option<ShapedLine>,
@@ -6081,7 +6079,6 @@ impl CursorLayout {
             origin,
             block_width,
             line_height,
-            radius: line_height * CURSOR_ROUNDNESS,
             color,
             shape,
             block_text,
@@ -6147,12 +6144,14 @@ impl CursorLayout {
 
     pub fn paint(&mut self, origin: gpui::Point<Pixels>, cx: &mut WindowContext) {
         let bounds = self.bounds(origin);
+        let hollow = matches!(self.shape, CursorShape::Hollow);
+        let radius = self.line_height * CURSOR_ROUNDNESS;
 
         //Draw background or border quad
-        let cursor = if matches!(self.shape, CursorShape::Hollow) {
-            outline_ex(bounds, self.color, self.radius, Pixels(CURSOR_THICKNESS))
+        let cursor = if hollow {
+            outline_ex(bounds, self.color, radius, CURSOR_THICKNESS)
         } else {
-            fill_ex(bounds, self.color, self.radius)
+            fill_ex(bounds, self.color, radius)
         };
 
         if let Some(name) = &mut self.cursor_name {
@@ -6161,18 +6160,20 @@ impl CursorLayout {
 
         cx.paint_quad(cursor);
 
-        // let bar_bounds = Bounds {
-        //     origin: gpui::Point {
-        //         x: bounds.origin.x,
-        //         y: bounds.origin.y - Pixels(2.0),
-        //     },
-        //     size: Size {
-        //         width: Pixels(2.0),
-        //         height: bounds.size.height + Pixels(4.0),
-        //     },
-        // };
-        // let bar = fill(bar_bounds, Hsla::red());
-        // cx.paint_quad(bar);
+        if hollow {
+            let bar_bounds = Bounds {
+                origin: gpui::Point {
+                    x: bounds.origin.x,
+                    y: bounds.origin.y - Pixels(2.0),
+                },
+                size: Size {
+                    width: CURSOR_THICKNESS,
+                    height: bounds.size.height + Pixels(4.0),
+                },
+            };
+            let bar = fill(bar_bounds, Hsla::red());
+            cx.paint_quad(bar);
+        }
 
         if let Some(block_text) = &self.block_text {
             block_text

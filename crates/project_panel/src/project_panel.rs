@@ -2670,10 +2670,10 @@ impl ProjectPanel {
                 }))
                 .h_full()
                 .absolute()
-                .right_1()
-                .top_1()
-                .bottom_1()
-                .w(px(12.))
+                .right_0()
+                .top_0()
+                .bottom_0()
+                .w(px(16.))
                 .cursor_default()
                 .child(ProjectPanelScrollbar::vertical(
                     percentage as f32..end_offset as f32,
@@ -2749,10 +2749,10 @@ impl ProjectPanel {
                 }))
                 .w_full()
                 .absolute()
-                .right_1()
-                .left_1()
-                .bottom_1()
-                .h(px(12.))
+                .right_0()
+                .left_0()
+                .bottom_0()
+                .h(px(16.))
                 .cursor_default()
                 .when(self.width.is_some(), |this| {
                     this.child(ProjectPanelScrollbar::horizontal(
