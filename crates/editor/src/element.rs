@@ -528,9 +528,16 @@ impl EditorElement {
                 }
             }
         }
-
-        let point_for_position =
-            position_map.point_for_position(text_hitbox.bounds, event.position);
+        // hack to adjust the mouse click position a little to the left
+        let x = (event.position.x - px(position_map.em_width / px(1.5)))
+            .max(text_hitbox.bounds.origin.x);
+        let point_for_position = position_map.point_for_position(
+            text_hitbox.bounds,
+            gpui::Point {
+                x,
+                y: event.position.y,
+            },
+        );
         let position = point_for_position.previous_valid;
         if modifiers.shift && modifiers.alt {
             editor.select(
