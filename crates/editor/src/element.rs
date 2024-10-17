@@ -3558,16 +3558,21 @@ impl EditorElement {
                 );
             }
 
-            let corner_radius = 0.15 * layout.position_map.line_height;
-
+            let line_end_overshoot = 0.3 * layout.position_map.line_height;
             for (player_color, selections) in &layout.selections {
+                // use sharper corners when there's a visible selection_border
+                let corner_radius = if player_color.selection_border.a == 0. {
+                    0.5
+                } else {
+                    0.33
+                } * line_end_overshoot;
                 for selection in selections.iter() {
                     self.paint_highlighted_range(
                         selection.range.clone(),
                         player_color.selection,
                         player_color.selection_border,
                         corner_radius,
-                        corner_radius * 2.,
+                        line_end_overshoot,
                         layout,
                         cx,
                     );
