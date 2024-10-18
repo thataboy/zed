@@ -1104,20 +1104,28 @@ impl Workspace {
 
             let mut paths_to_open = abs_paths;
 
-            let paths_order = serialized_workspace
+            let workspace_location = serialized_workspace
                 .as_ref()
                 .map(|ws| &ws.location)
                 .and_then(|loc| match loc {
-                    SerializedWorkspaceLocation::Local(_, order) => Some(order.order()),
+                    SerializedWorkspaceLocation::Local(paths, order) => {
+                        Some((paths.paths(), order.order()))
+                    }
                     _ => None,
                 });
 
-            if let Some(paths_order) = paths_order {
-                paths_to_open = paths_order
+            if let Some((paths, order)) = workspace_location {
+                // todo: should probably move this logic to a method on the SerializedWorkspaceLocation
+                // it's only valid for Local and would be more clear there and be able to be tested
+                // and reused elsewhere
+                paths_to_open = order
                     .iter()
-                    .filter_map(|i| paths_to_open.get(*i).cloned())
-                    .collect::<Vec<_>>();
-                if paths_order.iter().enumerate().any(|(i, &j)| i != j) {
+                    .zip(paths.iter())
+                    .sorted_by_key(|(i, _)| *i)
+                    .map(|(_, path)| path.clone())
+                    .collect();
+
+                if order.iter().enumerate().any(|(i, &j)| i != j) {
                     project_handle
                         .update(&mut cx, |project, cx| {
                             project.set_worktrees_reordered(true, cx);
@@ -1890,11 +1898,7 @@ impl Workspace {
                 directories: true,
                 multiple: true,
             },
-            if self.project.read(cx).is_via_ssh() {
-                DirectoryLister::Project(self.project.clone())
-            } else {
-                DirectoryLister::Local(self.app_state.fs.clone())
-            },
+            DirectoryLister::Local(self.app_state.fs.clone()),
             cx,
         );
 
@@ -5580,6 +5584,12 @@ pub fn open_ssh_project(
                     project_path_errors.push(error);
                 }
             };
+        }
+
+        if project_paths_to_open.is_empty() {
+            return Err(project_path_errors
+                .pop()
+                .unwrap_or_else(|| anyhow!("no paths given")));
         }
 
         cx.update_window(window.into(), |_, cx| {

@@ -24,8 +24,8 @@ use smallvec::SmallVec;
 use std::sync::Arc;
 use theme::ActiveTheme;
 use ui::{
-    h_flex, prelude::*, Avatar, Button, ButtonLike, ButtonStyle, ContextMenu, Icon,
-    IconButtonShape, IconName, IconSize, Indicator, PopoverMenu, Tooltip,
+    h_flex, prelude::*, Avatar, Button, ButtonLike, ButtonStyle, ContextMenu, Icon, IconName,
+    IconSize, IconWithIndicator, Indicator, PopoverMenu, Tooltip,
 };
 use util::ResultExt;
 use vcs_menu::{BranchList, OpenRecent as ToggleVcsMenu};
@@ -97,20 +97,6 @@ impl Render for TitleBar {
                 } else {
                     this.pl_2()
                 }
-            })
-            .map(|el| match decorations {
-                Decorations::Server => el,
-                Decorations::Client { tiling, .. } => el
-                    .when(!(tiling.top || tiling.right), |el| {
-                        el.rounded_tr(theme::CLIENT_SIDE_DECORATION_ROUNDING)
-                    })
-                    .when(!(tiling.top || tiling.left), |el| {
-                        el.rounded_tl(theme::CLIENT_SIDE_DECORATION_ROUNDING)
-                    })
-                    // this border is to avoid a transparent gap in the rounded corners
-                    .mt(px(-1.))
-                    .border(px(1.))
-                    .border_color(titlebar_color),
             })
             .bg(titlebar_color)
             .rounded_t_lg()
@@ -284,8 +270,6 @@ impl TitleBar {
             }
         };
 
-        let indicator_border_color = cx.theme().colors().title_bar_background;
-
         let icon_color = match self.project.read(cx).ssh_connection_state(cx)? {
             remote::ConnectionState::Connecting => Color::Info,
             remote::ConnectionState::Connected => Color::Default,
@@ -296,42 +280,22 @@ impl TitleBar {
 
         let meta = SharedString::from(meta);
 
-        let indicator = h_flex()
-            // We're using the circle inside a circle approach because, otherwise, by using borders
-            // we'd get a very thin, leaking indicator color, which is not what we want.
-            .absolute()
-            .size_2p5()
-            .right_0()
-            .bottom_0()
-            .bg(indicator_border_color)
-            .size_2p5()
-            .rounded_full()
-            .items_center()
-            .justify_center()
-            .overflow_hidden()
-            .child(Indicator::dot().color(indicator_color));
-
         Some(
-            div()
-                .relative()
+            ButtonLike::new("ssh-server-icon")
                 .child(
-                    IconButton::new("ssh-server-icon", IconName::Server)
-                        .icon_size(IconSize::Small)
-                        .shape(IconButtonShape::Square)
-                        .icon_color(icon_color)
-                        .tooltip(move |cx| {
-                            Tooltip::with_meta(
-                                "Remote Project",
-                                Some(&OpenRemote),
-                                meta.clone(),
-                                cx,
-                            )
-                        })
-                        .on_click(|_, cx| {
-                            cx.dispatch_action(OpenRemote.boxed_clone());
-                        }),
+                    IconWithIndicator::new(
+                        Icon::new(IconName::Server).color(icon_color),
+                        Some(Indicator::dot().color(indicator_color)),
+                    )
+                    .indicator_border_color(Some(cx.theme().colors().title_bar_background))
+                    .into_any_element(),
                 )
-                .child(indicator)
+                .tooltip(move |cx| {
+                    Tooltip::with_meta("Remote Project", Some(&OpenRemote), meta.clone(), cx)
+                })
+                .on_click(|_, cx| {
+                    cx.dispatch_action(OpenRemote.boxed_clone());
+                })
                 .into_any_element(),
         )
     }
