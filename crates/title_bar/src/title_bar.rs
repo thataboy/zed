@@ -100,7 +100,13 @@ impl Render for TitleBar {
             })
             .bg(titlebar_color)
             .rounded_t_lg()
-            .border_b_1()
+            .map(|this| {
+                if cx.is_maximized() || cx.is_fullscreen() {
+                    this.border_b_1()
+                } else {
+                    this.border_1()
+                }
+            })
             .border_color(cx.theme().colors().border_disabled)
             .content_stretch()
             .child(

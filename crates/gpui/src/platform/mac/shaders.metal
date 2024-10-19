@@ -499,7 +499,7 @@ fragment float4 path_sprite_fragment(
   float border_intensity;
 
   // TODO: Use a better technique for detecting borders?
-  for (float i = 1.0; i <= 2.0; i += 1.0) {
+  for (float i = 1.0; i <= 3.0; i += 1.0) {
     float2 offset = px_size * i;
 
     // Check the edge cases, literally
@@ -524,14 +524,13 @@ fragment float4 path_sprite_fragment(
     }
 
     if (is_border) {
-      border_intensity = 1.0 - (i - 1.0) * 0.1;
+      border_intensity = 1.0 - (i - 1.0) * 0.2;
       break;
     }
   }
 
   if (is_border) {
-    color = input.border_color;
-    color.a *= border_intensity;
+    color = mix(input.color, input.border_color, border_intensity);
   }
 
   color.a *= mask;
