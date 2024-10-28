@@ -5162,16 +5162,22 @@ impl Editor {
                             cx,
                         );
                     } else {
-                        this.highlight_background::<DocumentHighlightRead>(
-                            &read_ranges,
-                            |theme| {
-                                (
-                                    theme.editor_document_highlight_read_background,
-                                    Hsla::transparent_black(),
-                                )
-                            },
-                            cx,
-                        );
+                        let color = cx
+                            .theme()
+                            .colors()
+                            .editor_document_highlight_read_background;
+                        if color.a > 0. {
+                            this.highlight_background::<DocumentHighlightRead>(
+                                &read_ranges,
+                                |theme| {
+                                    (
+                                        theme.editor_document_highlight_read_background,
+                                        Hsla::transparent_black(),
+                                    )
+                                },
+                                cx,
+                            );
+                        }
                     }
                     let color = cx
                         .theme()
@@ -5191,16 +5197,22 @@ impl Editor {
                             cx,
                         );
                     } else {
-                        this.highlight_background::<DocumentHighlightWrite>(
-                            &write_ranges,
-                            |theme| {
-                                (
-                                    theme.editor_document_highlight_write_background,
-                                    Hsla::transparent_black(),
-                                )
-                            },
-                            cx,
-                        );
+                        let color = cx
+                            .theme()
+                            .colors()
+                            .editor_document_highlight_write_background;
+                        if color.a > 0. {
+                            this.highlight_background::<DocumentHighlightWrite>(
+                                &write_ranges,
+                                |theme| {
+                                    (
+                                        theme.editor_document_highlight_write_background,
+                                        Hsla::transparent_black(),
+                                    )
+                                },
+                                cx,
+                            );
+                        }
                     }
                     cx.notify();
                 })

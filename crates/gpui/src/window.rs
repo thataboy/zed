@@ -2364,6 +2364,15 @@ impl<'a> WindowContext<'a> {
         } else {
             style.thickness
         };
+        let origin = if style.wavy {
+            Point {
+                x: origin.x,
+                y: origin.y + (self.line_height() * 0.1).ceil().into(),
+            }
+        } else {
+            origin
+        };
+
         let bounds = Bounds {
             origin,
             size: size(width, height),
