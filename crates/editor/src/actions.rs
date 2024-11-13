@@ -88,6 +88,8 @@ pub struct ConfirmCodeAction {
 pub struct ToggleComments {
     #[serde(default)]
     pub advance_downwards: bool,
+    #[serde(default)]
+    pub ignore_indent: bool,
 }
 
 #[derive(PartialEq, Clone, Deserialize, Default)]
@@ -165,6 +167,13 @@ pub struct DeleteToPreviousWordStart {
 pub struct FoldAtLevel {
     pub level: u32,
 }
+
+#[derive(PartialEq, Clone, Deserialize, Default)]
+pub struct SpawnNearestTask {
+    #[serde(default)]
+    pub reveal: task::RevealStrategy,
+}
+
 impl_actions!(
     editor,
     [
@@ -191,6 +200,7 @@ impl_actions!(
         SelectToBeginningOfLine,
         SelectToEndOfLine,
         SelectUpByLines,
+        SpawnNearestTask,
         ShowCompletions,
         ToggleCodeActions,
         ToggleComments,
