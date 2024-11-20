@@ -727,6 +727,10 @@ impl Item for ProjectDiagnosticsEditor {
         self.excerpts.read(cx).is_dirty(cx)
     }
 
+    fn has_deleted_file(&self, cx: &AppContext) -> bool {
+        self.excerpts.read(cx).has_deleted_file(cx)
+    }
+
     fn has_conflict(&self, cx: &AppContext) -> bool {
         self.excerpts.read(cx).has_conflict(cx)
     }
@@ -795,7 +799,7 @@ fn diagnostic_header_renderer(diagnostic: Diagnostic) -> RenderBlock {
         let highlight_style: HighlightStyle = cx.theme().colors().text_accent.into();
         h_flex()
             .id(DIAGNOSTIC_HEADER)
-            .occlude()
+            .block_mouse_down()
             .h(2. * cx.line_height())
             .pl_10()
             .pr_5()

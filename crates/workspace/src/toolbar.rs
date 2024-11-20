@@ -98,7 +98,7 @@ impl Render for Toolbar {
         v_flex()
             .group("toolbar")
             .px(DynamicSpacing::Base08.rems(cx))
-            .py(DynamicSpacing::Base03.rems(cx))
+            .py(DynamicSpacing::Base01.rems(cx))
             .when(has_left_items || has_right_items, |this| {
                 this.gap(DynamicSpacing::Base08.rems(cx))
             })
