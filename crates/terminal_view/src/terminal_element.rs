@@ -1002,6 +1002,7 @@ impl InputHandler for TerminalInputHandler {
     fn text_for_range(
         &mut self,
         _: std::ops::Range<usize>,
+        _: &mut Option<std::ops::Range<usize>>,
         _: &mut WindowContext,
     ) -> Option<String> {
         None

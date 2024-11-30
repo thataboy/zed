@@ -406,7 +406,7 @@
       "ctrl-shift-p": "command_palette::Toggle",
       "f1": "command_palette::Toggle",
       "ctrl-shift-m": "diagnostics::Deploy",
-      "ctrl-shift-e": "project_panel::ToggleFocus",
+      "ctrl-shift-e": "pane::RevealInProjectPanel",
       "ctrl-shift-b": "outline_panel::ToggleFocus",
       "ctrl-?": "assistant::ToggleFocus",
       "ctrl-alt-s": "workspace::SaveAll",
@@ -595,6 +595,7 @@
       "ctrl-delete": ["project_panel::Delete", { "skip_prompt": false }],
       "alt-ctrl-r": "project_panel::RevealInFileManager",
       "ctrl-shift-enter": "project_panel::OpenWithSystem",
+      "ctrl-shift-e": "project_panel::ToggleFocus",
       "ctrl-shift-f": "project_panel::NewSearchInDirectory",
       "shift-down": "menu::SelectNext",
       "shift-up": "menu::SelectPrev",
@@ -651,10 +652,15 @@
     }
   },
   {
+    "context": "FileFinder",
+    "bindings": {
+      "ctrl": "file_finder::ToggleMenu"
+    }
+  },
+  {
     "context": "FileFinder && !menu_open",
     "bindings": {
       "ctrl-shift-p": "file_finder::SelectPrev",
-      "ctrl": "file_finder::OpenMenu",
       "ctrl-j": "pane::SplitDown",
       "ctrl-k": "pane::SplitUp",
       "ctrl-h": "pane::SplitLeft",
