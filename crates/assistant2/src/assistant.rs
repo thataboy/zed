@@ -1,6 +1,12 @@
+mod active_thread;
 mod assistant_panel;
+mod context;
+mod context_picker;
 mod message_editor;
 mod thread;
+mod thread_history;
+mod thread_store;
+mod ui;
 
 use command_palette_hooks::CommandPaletteFilter;
 use feature_flags::{Assistant2FeatureFlag, FeatureFlagAppExt};
@@ -10,7 +16,13 @@ pub use crate::assistant_panel::AssistantPanel;
 
 actions!(
     assistant2,
-    [ToggleFocus, NewThread, ToggleModelSelector, Chat]
+    [
+        ToggleFocus,
+        NewThread,
+        ToggleModelSelector,
+        OpenHistory,
+        Chat
+    ]
 );
 
 const NAMESPACE: &str = "assistant2";

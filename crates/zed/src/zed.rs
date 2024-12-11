@@ -29,7 +29,7 @@ use gpui::{
 pub use open_listener::*;
 use outline_panel::OutlinePanel;
 use paths::{local_settings_file_relative_path, local_tasks_file_relative_path};
-use project::{DirectoryLister, Item};
+use project::{DirectoryLister, ProjectItem};
 use project_panel::ProjectPanel;
 use quick_action_bar::QuickActionBar;
 use recent_projects::open_ssh_project;
@@ -197,7 +197,7 @@ pub fn initialize_workspace(
         }
 
         let inline_completion_button = cx.new_view(|cx| {
-            inline_completion_button::InlineCompletionButton::new(app_state.fs.clone(), cx)
+            inline_completion_button::InlineCompletionButton::new(workspace.weak_handle(), app_state.fs.clone(), cx)
         });
 
         let diagnostic_summary =
@@ -3447,6 +3447,7 @@ mod tests {
 
             app_state.languages.add(markdown_language());
 
+            vim_mode_setting::init(cx);
             theme::init(theme::LoadThemes::JustBase, cx);
             audio::init((), cx);
             channel::init(&app_state.client, app_state.user_store.clone(), cx);
